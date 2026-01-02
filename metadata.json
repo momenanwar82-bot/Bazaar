@@ -1,0 +1,7 @@
+{
+  "name": "Bazaar - Comprehensive Marketplace",
+  "description": "A high-end multi-category marketplace for selling cars, electronics, games, and more. Features AI-powered product descriptions and a modern LTR interface.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
