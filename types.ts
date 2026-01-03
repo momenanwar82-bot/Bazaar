@@ -27,12 +27,23 @@ export interface Product {
   imageUrl: string;
   location: string;
   createdAt: Date;
+  postDate?: string; // Format: YYYY/MM/DD
   sellerName: string;
   sellerEmail?: string; // Links product to a specific registered account
   phoneNumber: string;
   rating?: number;
   reviewsCount?: number;
   reviews?: Review[];
+}
+
+export interface SellerNotification {
+  id: string;
+  sellerEmail: string;
+  productTitle: string;
+  type: 'quality_removal' | 'new_review';
+  message: string;
+  timestamp: Date;
+  isRead: boolean;
 }
 
 export interface ChatMessage {

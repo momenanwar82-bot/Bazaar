@@ -1,7 +1,8 @@
 {
-  "name": "Bazaar - Comprehensive Marketplace",
-  "description": "A high-end multi-category marketplace for selling cars, electronics, games, and more. Features AI-powered product descriptions and a modern LTR interface.",
+  "name": "Bazaar Global Pro",
+  "description": "Premium AI-Powered Multi-Category Marketplace. Secure, Global, and Real-time.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "geolocation"
   ]
 }

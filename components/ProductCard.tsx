@@ -1,14 +1,18 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Product, Currency } from '../types';
+import { COUNTRY_CODES } from '../constants';
 
 interface ProductCardProps {
   product: Product;
   onClick: () => void;
   isWishlisted?: boolean;
   onToggleWishlist?: (e: React.MouseEvent) => void;
-  onRate?: (productId: string, rating: number) => void;
   currency: Currency;
+  onShowToast?: (message: string, type?: 'success' | 'error') => void;
+  currentUserEmail?: string;
+  onDelete?: (productId: string) => void;
+  showDeleteButton?: boolean; 
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
@@ -16,108 +20,126 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onClick, 
   isWishlisted = false, 
   onToggleWishlist,
-  onRate,
-  currency
+  currency,
+  onShowToast,
+  currentUserEmail,
+  onDelete,
+  showDeleteButton = false
 }) => {
-  const [hoverRating, setHoverRating] = useState(0);
   const convertedPrice = Math.round(product.price * currency.rate);
 
-  const handleStarClick = (e: React.MouseEvent, rating: number) => {
-    e.stopPropagation(); // Prevent opening the product modal
-    if (onRate) {
-      onRate(product.id, rating);
+  // شرط الملكية + شرط المكان (يظهر فقط إذا تم تمرير showDeleteButton بـ true)
+  const isOwner = currentUserEmail && product.sellerEmail && currentUserEmail === product.sellerEmail;
+  const canDelete = showDeleteButton && isOwner;
+
+  const handleWhatsAppClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    let digits = product.phoneNumber.replace(/\D/g, '');
+    if (digits.startsWith('0')) digits = '20' + digits.substring(1);
+    const message = encodeURIComponent(`Hi, I'm interested in: ${product.title}`);
+    window.open(`https://wa.me/${digits}?text=${message}`, '_blank');
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onDelete) return;
+
+    // رسالة التأكيد المطلوبة بالإنجليزية
+    const confirmDelete = window.confirm("Are you sure? This ad will be permanently deleted.");
+    if (confirmDelete) {
+      onDelete(product.id);
+    }
+  };
+
+  const handleShareClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareUrl = window.location.origin + window.location.pathname;
+    const shareData = {
+      title: `Bazaar: ${product.title}`,
+      text: `🔥 Check out this ${product.title} on Bazaar Marketplace!\n💰 Price: ${currency.symbol}${convertedPrice.toLocaleString()}`,
+      url: shareUrl
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') console.error("Share failed");
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        onShowToast?.("Ad link copied!", "success");
+      } catch (err) {
+        onShowToast?.("Copy failed.", "error");
+      }
     }
   };
 
   return (
     <div 
       onClick={onClick}
-      className="group bg-slate-900 rounded-[32px] overflow-hidden border border-slate-800/50 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500 cursor-pointer flex flex-col h-full active:scale-[0.98] relative"
+      className="group bg-gradient-to-br from-indigo-950 via-indigo-900/40 to-slate-950 rounded-[35px] overflow-hidden border border-indigo-500/10 shadow-2xl transition-all duration-500 cursor-pointer flex flex-col h-full active:scale-[0.98] relative text-left"
     >
-      <div className="relative aspect-[4/5] overflow-hidden">
+      <div className="relative aspect-[4/5] overflow-hidden bg-indigo-950/50 flex items-center justify-center">
         <img 
           src={product.imageUrl} 
           alt={product.title}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 brightness-[1.05]"
+          loading="lazy"
         />
         
-        {/* Category Badge */}
-        <div className="absolute top-4 right-4 bg-slate-950/80 backdrop-blur-xl px-3 py-1.5 rounded-xl text-[10px] font-black text-white border border-white/5 z-10 uppercase tracking-widest">
-          {product.category}
-        </div>
-
-        {/* Aggregate Rating Badge (Bottom Right) - Now back to Star */}
-        {product.rating && product.rating > 0 && (
-          <div className="absolute bottom-4 right-4 bg-slate-900/90 backdrop-blur-xl px-2.5 py-1.5 rounded-xl text-xs font-black text-amber-400 border border-white/5 z-10 flex items-center gap-1.5 shadow-xl">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 fill-current" viewBox="0 0 20 20">
-               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+        {/* زر الحذف للسلة الحمراء - يظهر فقط في My Ads ولصاحب الإعلان */}
+        {canDelete && (
+          <button
+            onClick={handleDeleteClick}
+            className="absolute top-4 right-4 p-3 rounded-full bg-red-600 shadow-2xl border border-white/20 z-30 hover:bg-red-500 hover:scale-110 active:scale-90 transition-all flex items-center justify-center"
+          >
+            <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            {product.rating}
-          </div>
+          </button>
         )}
 
-        {/* Interactive Star Rating Bar - Back to Stars */}
-        <div 
-          className="absolute bottom-4 left-4 right-16 flex items-center justify-center gap-3 bg-white/5 backdrop-blur-2xl px-4 py-2.5 rounded-2xl border border-white/10 z-20 shadow-2xl transition-all group-hover:bg-white/10"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center gap-1">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                onMouseEnter={() => setHoverRating(star)}
-                onMouseLeave={() => setHoverRating(0)}
-                onClick={(e) => handleStarClick(e, star)}
-                className="transition-all hover:scale-125 focus:outline-none"
-              >
-                <svg 
-                  className={`w-4.5 h-4.5 transition-colors ${star <= (hoverRating || (product.rating || 0)) ? 'text-amber-400 fill-current' : 'text-white/20'}`} 
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Wishlist Button (The Heart drawing / Like button) - Stays as Heart */}
         <button
           onClick={onToggleWishlist}
-          className={`absolute top-4 left-4 p-2.5 rounded-2xl backdrop-blur-xl transition-all z-10 border shadow-lg ${
-            isWishlisted ? 'bg-red-600 text-white border-red-400 scale-110' : 'bg-slate-950/40 text-white/70 border-white/5 hover:text-white hover:bg-slate-950'
+          className={`absolute top-4 left-4 p-2.5 rounded-xl backdrop-blur-xl transition-all z-10 border ${
+            isWishlisted ? 'bg-red-500 text-white border-red-400' : 'bg-black/40 text-white/70 border-white/10 hover:bg-black/60'
           }`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className={`h-4.5 w-4.5 ${isWishlisted ? 'fill-current' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          <svg className={`h-4 w-4 ${isWishlisted ? 'fill-current' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
         </button>
+
+        <div className="absolute top-16 left-4 bg-indigo-600/80 backdrop-blur-md px-3 py-1 rounded-xl text-[7px] font-black text-white border border-white/10 z-10 uppercase tracking-widest">
+          {product.category}
+        </div>
       </div>
 
-      <div className="p-6 flex flex-col flex-grow bg-slate-900">
-        <h3 className="text-lg font-black text-white mb-2 line-clamp-1 group-hover:text-indigo-400 transition-colors uppercase tracking-tight">
-          {product.title}
-        </h3>
-        <p className="text-slate-500 text-[11px] line-clamp-2 mb-4 flex-grow leading-relaxed font-medium">
-          {product.description}
-        </p>
-        
-        <div className="flex items-center justify-between mt-auto pt-5 border-t border-slate-800/50">
-          <div className="flex flex-col">
-            <span className="text-xl font-black text-indigo-400 tracking-tighter">
-              {currency.symbol}{convertedPrice.toLocaleString()}
-            </span>
-            <div className="text-[9px] text-slate-600 mt-1 font-black uppercase tracking-widest flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 bg-slate-700 rounded-full"></div>
-              {product.location.split(',')[0]}
-            </div>
-          </div>
-          
-          <div className="bg-slate-800/50 p-3 rounded-[18px] border border-slate-700/50 group-hover:bg-indigo-600 transition-all group-hover:border-indigo-500">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
-            </svg>
-          </div>
+      <div className="p-5 flex flex-col flex-grow">
+        <div className="mb-4">
+          <h3 className="text-[12px] font-black text-white uppercase tracking-tight line-clamp-1 mb-1">
+            {product.title}
+          </h3>
+          <span className="text-xl font-black text-indigo-400">
+            {currency.symbol}{convertedPrice.toLocaleString()}
+          </span>
+        </div>
+
+        <div className="mt-auto flex flex-col gap-2.5">
+          <button 
+            onClick={handleShareClick}
+            className="w-full py-3.5 bg-indigo-600/10 hover:bg-indigo-600/30 text-indigo-400 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 transition-all border border-indigo-500/30 uppercase tracking-[0.2em]"
+          >
+            SHARE AD
+          </button>
+          <button 
+            onClick={handleWhatsAppClick}
+            className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 transition-all shadow-xl active:scale-95 border border-white/10 uppercase tracking-[0.2em]"
+          >
+            WHATSAPP
+          </button>
         </div>
       </div>
     </div>

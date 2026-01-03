@@ -39,6 +39,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     fetchStats();
   }, [sellerName]);
 
+  // Verified Status: 50+ reviews AND 4.5+ rating
+  const isVerified = (stats?.rating || 0) >= 4.5 && (stats?.reviewsCount || 0) >= 50;
+
   const renderStars = (rating: number) => {
     return (
       <div className="flex items-center gap-1">
@@ -81,7 +84,19 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   {sellerName.charAt(0)}
                 </div>
                 <div>
-                  <h2 className="text-3xl font-black text-white">{sellerName}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-3xl font-black text-white">{sellerName}</h2>
+                    {isVerified && !loading && (
+                      <div className="group relative cursor-help">
+                        <svg className="w-6 h-6 text-blue-500 fill-current" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.64.304 1.25.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-1.5 bg-blue-600 text-[10px] text-white font-black uppercase rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl border border-blue-400/30">
+                          Verified Pro Seller
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <div className="mt-1">
                     {loading ? (
                       <div className="h-5 w-32 bg-slate-800 animate-pulse rounded"></div>

@@ -21,6 +21,21 @@ export const CURRENCIES: Currency[] = [
   { code: 'EUR', symbol: '€', rate: 0.92, label: 'Euro' },
 ];
 
+export const COUNTRY_CODES = [
+  { code: '20', country: 'Egypt', flag: '🇪🇬', iso: 'EG' },
+  { code: '966', country: 'Saudi Arabia', flag: '🇸🇦', iso: 'SA' },
+  { code: '971', country: 'UAE', flag: '🇦🇪', iso: 'AE' },
+  { code: '1', country: 'USA', flag: '🇺🇸', iso: 'US' },
+  { code: '34', country: 'Spain', flag: '🇪🇸', iso: 'ES' },
+  { code: '212', country: 'Morocco', flag: '🇲🇦', iso: 'MA' },
+  { code: '213', country: 'Algeria', flag: '🇩🇿', iso: 'DZ' },
+  { code: '964', country: 'Iraq', flag: '🇮🇶', iso: 'IQ' },
+  { code: '86', country: 'China', flag: '🇨🇳', iso: 'CN' },
+  { code: '91', country: 'India', flag: '🇮🇳', iso: 'IN' },
+  { code: '62', country: 'Indonesia', flag: '🇮🇩', iso: 'ID' },
+  { code: '92', country: 'Pakistan', flag: '🇵🇰', iso: 'PK' },
+];
+
 const createReview = (name: string, rating: number, comment: string): Review => ({
   id: Math.random().toString(36).substr(2, 9),
   userName: name,
@@ -40,7 +55,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     location: 'New York, USA',
     createdAt: new Date(),
     sellerName: 'James Smith',
-    phoneNumber: '+12125550199',
+    phoneNumber: '12125550199',
     rating: 4.9,
     reviewsCount: 3,
     reviews: [
@@ -59,46 +74,12 @@ export const INITIAL_PRODUCTS: Product[] = [
     location: 'London, UK',
     createdAt: new Date(),
     sellerName: 'Oliver Williams',
-    phoneNumber: '+442071234567',
+    phoneNumber: '442071234567',
     rating: 4.8,
     reviewsCount: 2,
     reviews: [
       createReview("Emma W.", 5, "Perfect condition. Battery health is 100%."),
       createReview("David L.", 4, "Fast shipping. Original box included.")
-    ]
-  },
-  {
-    id: 'c1',
-    title: 'Vintage Leather Biker Jacket',
-    description: 'Premium distressed black leather jacket. Classic asymmetric zip, heavy-duty hardware. Size Large. Perfect for autumn/winter styles.',
-    price: 450,
-    category: 'Clothing',
-    imageUrl: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&q=80&w=800',
-    location: 'Berlin, Germany',
-    createdAt: new Date(),
-    sellerName: 'Vintage Hub',
-    phoneNumber: '+4915212345678',
-    rating: 4.5,
-    reviewsCount: 1,
-    reviews: [
-      createReview("Lukas G.", 4, "Beautiful leather. Fits true to size.")
-    ]
-  },
-  {
-    id: '3',
-    title: 'Luxury Apartment Burj Khalifa View',
-    description: 'Fully furnished apartment, 3 bedrooms, panoramic view, private pool and gym.',
-    price: 1500000,
-    category: 'Real Estate',
-    imageUrl: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800',
-    location: 'Dubai, UAE',
-    createdAt: new Date(),
-    sellerName: 'Gulf Properties',
-    phoneNumber: '+97141234567',
-    rating: 5.0,
-    reviewsCount: 1,
-    reviews: [
-      createReview("Ahmed M.", 5, "Spectacular view. Highly recommended for investors.")
     ]
   }
 ];

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Category, Product, Chat, ChatMessage, Currency, Review } from './types';
+import { Category, Product, Currency, SellerNotification } from './types';
 import { INITIAL_PRODUCTS, CURRENCIES } from './constants';
 import Navbar from './components/Navbar';
 import CategoryBar from './components/CategoryBar';
@@ -8,352 +8,291 @@ import ProductCard from './components/ProductCard';
 import SellProductModal from './components/SellProductModal';
 import ProductDetailModal from './components/ProductDetailModal';
 import LoginModal from './components/LoginModal';
-import ChatManager from './components/ChatManager';
-import UserProfileModal from './components/UserProfileModal';
 import UserSummaryModal from './components/UserSummaryModal';
+import Footer from './components/Footer';
+import AdBanner from './components/AdBanner';
+import { PrivacyModal, TermsModal, ContactModal } from './components/LegalModals';
+import { 
+  db, 
+  auth,
+  saveProductToDB, 
+  deleteProductFromDB, 
+  markNotificationAsRead,
+  logoutUser,
+  getUserUploadCountToday
+} from './services/geminiService';
+import { 
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { 
+  collection, 
+  onSnapshot, 
+  query, 
+  orderBy,
+  where
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const App: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [notifications, setNotifications] = useState<SellerNotification[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const [summaryInitialTab, setSummaryInitialTab] = useState<'listings' | 'saved' | 'alerts'>('listings');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-  const [viewingProfileSeller, setViewingProfileSeller] = useState<string | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(CURRENCIES[0]);
-  
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [isChatManagerOpen, setIsChatManagerOpen] = useState(false);
   const [user, setUser] = useState<{ email: string; name: string } | null>(null);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [dbEmpty, setDbEmpty] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [remainingAds, setRemainingAds] = useState(0);
+
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showContact, setShowContact] = useState(false);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('bazaar_user_v2');
-    if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      setUser(parsedUser);
-      const savedWishlist = localStorage.getItem(`bazaar_wishlist_${parsedUser.email}`);
-      if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
-    }
-    
-    const globalWishlist = localStorage.getItem('bazaar_wishlist');
-    if (globalWishlist && !user) setWishlist(JSON.parse(globalWishlist));
-
-    const savedChats = localStorage.getItem('bazaar_chats');
-    if (savedChats) {
-      const parsed = JSON.parse(savedChats);
-      const hydrated = parsed.map((c: Chat) => ({
-        ...c,
-        messages: c.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) }))
-      }));
-      setChats(hydrated);
-    }
-    const savedProducts = localStorage.getItem('bazaar_products');
-    if (savedProducts) {
-      const parsed = JSON.parse(savedProducts).map((p: any) => ({
-        ...p, 
-        createdAt: new Date(p.createdAt),
-        reviews: (p.reviews || []).map((r: any) => ({ ...r, timestamp: new Date(r.timestamp) }))
-      }));
-      setProducts(parsed);
-    }
-    
-    const savedCurrencyCode = localStorage.getItem('bazaar_currency');
-    if (savedCurrencyCode) {
-      const found = CURRENCIES.find(c => c.code === savedCurrencyCode);
-      if (found) setSelectedCurrency(found);
-    }
-    setIsInitialLoad(false);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({ email: firebaseUser.email || '', name: firebaseUser.displayName || 'User' });
+      } else {
+        setUser(null);
+      }
+      setIsInitialLoad(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (user) {
-      localStorage.setItem(`bazaar_wishlist_${user.email}`, JSON.stringify(wishlist));
-    } else {
-      localStorage.setItem('bazaar_wishlist', JSON.stringify(wishlist));
-    }
-  }, [wishlist, user]);
+    const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedProducts = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: String(data.title || ''),
+          description: String(data.description || ''),
+          price: Number(data.price || 0),
+          category: data.category as Category,
+          imageUrl: String(data.imageUrl || ''),
+          location: String(data.location || ''),
+          sellerName: String(data.sellerName || ''),
+          sellerEmail: String(data.sellerEmail || ''),
+          phoneNumber: String(data.phoneNumber || ''),
+          rating: Number(data.rating || 0),
+          reviewsCount: Number(data.reviewsCount || 0),
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date()
+        } as Product;
+      });
+      
+      if (fetchedProducts.length === 0) {
+        setProducts([]);
+        setDbEmpty(true);
+      } else {
+        setProducts(fetchedProducts);
+        setDbEmpty(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const displayProducts = useMemo(() => {
+    if (products.length === 0 && dbEmpty) return []; 
+    return products;
+  }, [products, dbEmpty]);
 
   useEffect(() => {
-    localStorage.setItem('bazaar_chats', JSON.stringify(chats));
-  }, [chats]);
+    if (!user) return;
+    updateRemainingAds();
+    const q = query(collection(db, "notifications"), where("sellerEmail", "==", user.email));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetched = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          sellerEmail: String(data.sellerEmail || ''),
+          productTitle: String(data.productTitle || ''),
+          type: data.type as any,
+          message: String(data.message || ''),
+          isRead: Boolean(data.isRead),
+          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date()
+        };
+      }) as SellerNotification[];
+      setNotifications(fetched.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()));
+    });
+    return () => unsubscribe();
+  }, [user]);
 
-  useEffect(() => {
-    localStorage.setItem('bazaar_products', JSON.stringify(products));
-  }, [products]);
-
-  const handleCurrencyChange = (curr: Currency) => {
-    setSelectedCurrency(curr);
-    localStorage.setItem('bazaar_currency', curr.code);
+  const updateRemainingAds = async () => {
+    if (!user) return;
+    const count = await getUserUploadCountToday(user.email);
+    setRemainingAds(Math.max(0, 2 - count));
   };
 
-  const handleLogin = (email: string, name: string) => {
-    const newUser = { email, name };
-    setUser(newUser);
-    localStorage.setItem('bazaar_user_v2', JSON.stringify(newUser));
-    const savedWishlist = localStorage.getItem(`bazaar_wishlist_${email}`);
-    setWishlist(savedWishlist ? JSON.parse(savedWishlist) : []);
-    setIsLoginModalOpen(false);
-  };
-
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logoutUser();
     setUser(null);
-    localStorage.removeItem('bazaar_user_v2');
-    setChats([]);
-    setActiveChatId(null);
-    setWishlist([]);
-    setIsChatManagerOpen(false);
     setIsSummaryModalOpen(false);
+    showToast("Successfully logged out");
+  };
+
+  const handleAddProduct = async (newProduct: Product) => {
+    if (!user) return;
+    try {
+      const cleanDataForDB = {
+        title: String(newProduct.title),
+        description: String(newProduct.description),
+        price: Number(newProduct.price),
+        category: String(newProduct.category),
+        imageUrl: String(newProduct.imageUrl),
+        location: String(newProduct.location),
+        phoneNumber: String(newProduct.phoneNumber),
+        sellerName: String(user.name),
+        sellerEmail: String(user.email),
+        rating: 0,
+        reviewsCount: 0
+      };
+
+      await saveProductToDB(cleanDataForDB);
+      await updateRemainingAds();
+      showToast("Listing published successfully!");
+      setIsSellModalOpen(false);
+    } catch (err) {
+      console.error("Publish error:", err);
+      showToast("Failed to publish ad", "error");
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    if (!user) return;
+    try {
+      await deleteProductFromDB(productId);
+      await updateRemainingAds();
+      showToast("Ad removed successfully");
+      if (selectedProduct?.id === productId) setSelectedProduct(null);
+    } catch (err) {
+      showToast("Delete failed.", "error");
+    }
   };
 
   const toggleWishlist = (productId: string) => {
-    setWishlist(prev => 
-      prev.includes(productId) 
-        ? prev.filter(id => id !== productId) 
-        : [...prev, productId]
-    );
+    const exists = wishlist.includes(productId);
+    setWishlist(prev => exists ? prev.filter(id => id !== productId) : [...prev, productId]);
+    showToast(exists ? "Removed from saved" : "Added to saved");
   };
-
-  const handleRateProduct = (productId: string, newRatingValue: number) => {
-    const reviewerName = user?.name || "Guest Buyer";
-    const newReview: Review = {
-      id: Date.now().toString(),
-      userName: reviewerName,
-      rating: newRatingValue,
-      comment: "Highly rated via quick review.",
-      timestamp: new Date()
-    };
-
-    setProducts(prev => prev.map(p => {
-      if (p.id === productId) {
-        const currentReviews = p.reviews || [];
-        const nextReviews = [newReview, ...currentReviews];
-        const nextCount = nextReviews.length;
-        const totalRating = nextReviews.reduce((sum, r) => sum + r.rating, 0);
-        const nextRating = Number((totalRating / nextCount).toFixed(1));
-        
-        const updatedProduct = { ...p, rating: nextRating, reviewsCount: nextCount, reviews: nextReviews };
-        if (selectedProduct?.id === productId) {
-          setSelectedProduct(updatedProduct);
-        }
-        return updatedProduct;
-      }
-      return p;
-    }));
-  };
-
-  const startChat = (product: Product) => {
-    if (!user) return;
-    const existingChat = chats.find(c => c.productId === product.id);
-    if (existingChat) {
-      setActiveChatId(existingChat.id);
-    } else {
-      const newChat: Chat = {
-        id: Date.now().toString(),
-        productId: product.id,
-        productTitle: product.title,
-        productImage: product.imageUrl,
-        sellerName: product.sellerName,
-        lastMessage: 'Hi! Regarding this item, I\'m available to answer your questions.',
-        messages: [{
-          id: '1',
-          sender: product.sellerName,
-          text: `Hi! Regarding "${product.title}", I'm available to answer your questions.`,
-          timestamp: new Date(),
-          status: 'read'
-        }],
-        unread: false
-      };
-      setChats([newChat, ...chats]);
-      setActiveChatId(newChat.id);
-    }
-    setIsChatManagerOpen(true);
-    setSelectedProduct(null);
-  };
-
-  const userProducts = useMemo(() => {
-    if (!user) return [];
-    return products.filter(p => p.sellerEmail === user.email);
-  }, [products, user]);
-
-  const wishlistedProducts = useMemo(() => {
-    return products.filter(p => wishlist.includes(p.id));
-  }, [products, wishlist]);
 
   const filteredProducts = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-    return products.filter((p) => {
+    return displayProducts.filter(p => {
       const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-      const matchesSearch = query === '' || 
-                            p.title.toLowerCase().includes(query) || 
-                            p.description.toLowerCase().includes(query) ||
-                            p.category.toLowerCase().includes(query) ||
-                            p.location.toLowerCase().includes(query);
-      const matchesWishlist = !showFavoritesOnly || wishlist.includes(p.id);
-      return matchesCategory && matchesSearch && matchesWishlist;
+      const matchesSearch = searchQuery === '' || p.title.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesFav = !showFavoritesOnly || wishlist.includes(p.id);
+      return matchesCategory && matchesSearch && matchesFav;
     });
-  }, [products, selectedCategory, searchQuery, showFavoritesOnly, wishlist]);
+  }, [displayProducts, selectedCategory, searchQuery, showFavoritesOnly, wishlist]);
 
-  const handleAddProduct = (newProduct: Product) => {
-    if (!user) return;
-    const productWithSeller = { 
-      ...newProduct, 
-      sellerName: user.name,
-      sellerEmail: user.email,
-      rating: 0, 
-      reviewsCount: 0, 
-      reviews: [] 
-    };
-    setProducts([productWithSeller, ...products]);
-    setIsSellModalOpen(false);
-  };
+  if (isInitialLoad) return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
 
-  const handleSendMessage = (chatId: string, text: string) => {
-    if (!user) return;
-    setChats(prev => prev.map(c => {
-      if (c.id === chatId) {
-        const newMessage: ChatMessage = {
-          id: Date.now().toString(),
-          sender: text.includes("Hi! Regarding") || text.includes("Hello, how can I help you?") ? c.sellerName : user.name,
-          text,
-          timestamp: new Date(),
-          status: 'read'
-        };
-        const finalSender = chats.find(chat => chat.id === chatId)?.sellerName === newMessage.sender ? c.sellerName : user.name;
-        newMessage.sender = finalSender;
-
-        return {
-          ...c,
-          messages: [...c.messages, newMessage],
-          lastMessage: text
-        };
-      }
-      return c;
-    }));
-  };
-
-  if (isInitialLoad) return null;
-
-  // Force login if no user is found
   if (!user) {
-    return <LoginModal onClose={() => {}} onLogin={handleLogin} hideCloseButton={true} />;
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
+        <LoginModal onClose={() => {}} onLogin={(e, n) => setUser({email: e, name: n})} hideCloseButton={true} initialMode="login" />
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col transition-colors duration-300">
+    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
       <Navbar 
-        onSearch={setSearchQuery} 
-        onOpenSellModal={() => setIsSellModalOpen(true)}
-        user={user}
-        onOpenLogin={() => setIsLoginModalOpen(true)}
-        onLogout={handleLogout}
-        wishlistCount={wishlist.length}
-        showFavoritesOnly={showFavoritesOnly}
-        onToggleFavorites={() => setShowFavoritesOnly(!showFavoritesOnly)}
-        onOpenChat={() => setIsChatManagerOpen(true)}
-        unreadChats={chats.filter(c => c.unread).length}
-        onViewMyProfile={() => setIsSummaryModalOpen(true)}
-        selectedCurrency={selectedCurrency}
-        onCurrencyChange={handleCurrencyChange}
+        onSearch={setSearchQuery} onOpenSellModal={() => setIsSellModalOpen(true)} user={user}
+        onOpenLogin={() => {}} onOpenSignUp={() => {}} onLogout={handleLogout}
+        wishlistCount={wishlist.length} showFavoritesOnly={showFavoritesOnly} onToggleFavorites={() => setShowFavoritesOnly(!showFavoritesOnly)}
+        onOpenNotifications={() => { setSummaryInitialTab('alerts'); setIsSummaryModalOpen(true); }}
+        unreadCount={notifications.filter(n => !n.isRead).length} notifications={notifications}
+        onMarkAsRead={markNotificationAsRead} onClearAll={() => {}}
+        onViewMyProfile={() => { setSummaryInitialTab('listings'); setIsSummaryModalOpen(true); }}
+        selectedCurrency={selectedCurrency} onCurrencyChange={setSelectedCurrency} remainingAds={remainingAds}
       />
       
-      <CategoryBar 
-        selectedCategory={selectedCategory} 
-        onSelectCategory={(cat) => {
-          setSelectedCategory(cat);
-          setShowFavoritesOnly(false);
-        }} 
-      />
+      <CategoryBar selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
 
-      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <div className="mb-8">
-          <h1 className="text-3xl font-black text-white uppercase tracking-tight">
-            {showFavoritesOnly ? 'Favorites' : selectedCategory === 'All' ? 'Global Marketplace' : `${selectedCategory}`}
-          </h1>
-          <p className="text-slate-500 text-xs mt-1 uppercase tracking-widest">
-            {searchQuery ? `Searching for "${searchQuery}"` : 'Curated premium listings for global traders'}
-          </p>
-        </div>
+      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full relative text-left">
+        <h1 className="text-xl sm:text-2xl font-black text-white uppercase mb-6 tracking-tight flex items-center gap-3">
+          <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+          {showFavoritesOnly ? 'My Favorites' : selectedCategory === 'All' ? 'Marketplace' : selectedCategory}
+        </h1>
 
         {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-              <ProductCard 
-                key={product.id} 
-                product={product} 
-                onClick={() => setSelectedProduct(product)}
-                isWishlisted={wishlist.includes(product.id)}
-                onToggleWishlist={(e) => {
-                  e.stopPropagation();
-                  toggleWishlist(product.id);
-                }}
-                onRate={handleRateProduct}
-                currency={selectedCurrency}
-              />
+          <div className="grid grid-cols-2 gap-4 sm:gap-8">
+            {filteredProducts.map((product, index) => (
+              <React.Fragment key={product.id}>
+                <ProductCard 
+                  product={product} onClick={() => setSelectedProduct(product)}
+                  isWishlisted={wishlist.includes(product.id)} onToggleWishlist={(e) => { e.stopPropagation(); toggleWishlist(product.id); }}
+                  currency={selectedCurrency} onShowToast={showToast} currentUserEmail={user.email} 
+                  onDelete={handleDeleteProduct} showDeleteButton={false} 
+                />
+                {(index + 1) % 2 === 0 && (
+                  <div className="col-span-2 my-4">
+                    <AdBanner />
+                  </div>
+                )}
+              </React.Fragment>
             ))}
           </div>
         ) : (
-          <div className="text-center py-20 bg-slate-900/30 rounded-[40px] border border-slate-800/50 border-dashed">
-            <p className="text-slate-600 font-black uppercase tracking-[0.3em]">No results found</p>
+          <div className="py-32 text-center">
+             <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-6 opacity-20">
+                <svg className="w-12 h-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+             </div>
+             <p className="text-slate-500 font-black text-[10px] uppercase tracking-[0.4em]">No listings found in this category</p>
+          </div>
+        )}
+
+        {toast && (
+          <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] px-8 py-4 rounded-2xl shadow-2xl border backdrop-blur-xl animate-in slide-in-from-bottom-5 duration-500 font-black text-[10px] uppercase tracking-widest ${
+            toast.type === 'success' ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30' : 'bg-red-600/20 text-red-400 border-red-500/30'
+          }`}>
+            {toast.message}
           </div>
         )}
       </main>
 
-      {isChatManagerOpen && (
-        <ChatManager 
-          chats={chats}
-          activeChatId={activeChatId}
-          currentUser={user.name}
-          onClose={() => setIsChatManagerOpen(false)}
-          onSelectChat={setActiveChatId}
-          onSendMessage={handleSendMessage}
-        />
-      )}
+      <Footer onOpenPrivacy={() => setShowPrivacy(true)} onOpenTerms={() => setShowTerms(true)} onOpenContact={() => setShowContact(true)} onOpenSell={() => setIsSellModalOpen(true)} />
 
-      {isSellModalOpen && <SellProductModal onClose={() => setIsSellModalOpen(false)} onAdd={handleAddProduct} />}
+      {isSellModalOpen && <SellProductModal onClose={() => setIsSellModalOpen(false)} onAdd={handleAddProduct} userEmail={user.email} />}
+      {selectedProduct && <ProductDetailModal 
+        product={selectedProduct} onClose={() => setSelectedProduct(null)} 
+        isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={() => toggleWishlist(selectedProduct.id)} 
+        onViewProfile={() => {}} currency={selectedCurrency} currentUserEmail={user.email} currentUserName={user.name} 
+        onDeleteProduct={handleDeleteProduct} onShowToast={showToast} 
+      />}
       {isSummaryModalOpen && (
         <UserSummaryModal 
-          user={user} 
-          userProducts={userProducts} 
-          wishlistedProducts={wishlistedProducts}
-          onClose={() => setIsSummaryModalOpen(false)} 
-          onLogout={handleLogout}
-          onProductClick={(p) => { setSelectedProduct(p); setIsSummaryModalOpen(false); }}
-          currency={selectedCurrency}
+          user={user} userProducts={products.filter(p => p.sellerEmail === user.email)} 
+          wishlistedProducts={products.filter(p => wishlist.includes(p.id))} 
+          notifications={notifications} onClose={() => setIsSummaryModalOpen(false)} 
+          onLogout={handleLogout} onProductClick={(p) => setSelectedProduct(p)} 
+          currency={selectedCurrency} onDeleteProduct={handleDeleteProduct} 
+          onClearNotification={markNotificationAsRead} onRefresh={async () => {}}
+          initialTab={summaryInitialTab} currentUserEmail={user.email} remainingAds={remainingAds}
         />
       )}
       
-      {selectedProduct && (
-        <ProductDetailModal 
-          product={selectedProduct} 
-          onClose={() => setSelectedProduct(null)} 
-          isWishlisted={wishlist.includes(selectedProduct.id)}
-          onToggleWishlist={() => toggleWishlist(selectedProduct.id)}
-          onStartChat={startChat}
-          onViewProfile={(seller) => { setViewingProfileSeller(seller); setSelectedProduct(null); }}
-          onRate={handleRateProduct}
-          currency={selectedCurrency}
-        />
-      )}
-
-      {viewingProfileSeller && (
-        <UserProfileModal 
-          sellerName={viewingProfileSeller}
-          allProducts={products}
-          onClose={() => setViewingProfileSeller(null)}
-          onProductClick={(p) => { setSelectedProduct(p); setViewingProfileSeller(null); }}
-          onStartChat={(p) => { startChat(p); setViewingProfileSeller(null); }}
-        />
-      )}
-
-      <footer className="bg-slate-950 border-t border-slate-900 py-12 text-center">
-        <div className="text-[10px] text-slate-700 font-black uppercase tracking-[0.5em] mb-4">Bazaar Global Premium</div>
-        <p className="text-[9px] text-slate-800 max-w-md mx-auto leading-relaxed">Verified trade platform. AI Moderated. Multi-currency support enabled.</p>
-      </footer>
+      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
+      {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
+      {showContact && <ContactModal onClose={() => setShowContact(false)} />}
     </div>
   );
 };

@@ -1,73 +1,127 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Category, Product } from '../types';
-import { CATEGORIES } from '../constants';
-import { generateProductDescription, analyzeImageSafety, identifyProductFromImage } from '../services/geminiService';
+import { CATEGORIES, COUNTRY_CODES } from '../constants';
+import { generateProductDescription, analyzeImageSafety, identifyProductFromImage, getUserUploadCountToday } from '../services/geminiService';
 
 interface SellProductModalProps {
   onClose: () => void;
   onAdd: (product: Product) => void;
+  userEmail: string;
 }
 
-const SellProductModal: React.FC<SellProductModalProps> = ({ onClose, onAdd }) => {
+const SellProductModal: React.FC<SellProductModalProps> = ({ onClose, onAdd, userEmail }) => {
   const [loading, setLoading] = useState(false);
   const [analyzingImage, setAnalyzingImage] = useState(false);
   const [imageError, setImageError] = useState('');
-  const [magicFill, setMagicFill] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
+  const [checkingLimit, setCheckingLimit] = useState(true);
+  const [showCountrySearch, setShowCountrySearch] = useState(false);
+  const [countrySearchQuery, setCountrySearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const countryDropdownRef = useRef<HTMLDivElement>(null);
   
+  const [countryData, setCountryData] = useState(COUNTRY_CODES[0]);
   const [formData, setFormData] = useState({
     title: '',
-    category: 'Cars' as Category,
+    category: 'Others' as Category,
     price: '',
     location: '',
     phoneNumber: '',
     description: '',
-    imageUrl: '' 
+    imageUrl: ''
   });
 
-  const MIN_DESC_LENGTH = 100;
+  const wordCount = formData.description.trim() === '' ? 0 : formData.description.trim().split(/\s+/).length;
+  const isDescriptionShort = wordCount > 0 && wordCount < 10;
+
+  // ضغط الصورة لضمان استجابة لحظية من Gemini ومنع تعليق المتصفح
+  const compressImage = (base64Str: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 700; // حجم مثالي للرؤية
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.6)); // ضغط متوسط للسرعة
+      };
+    });
+  };
+
+  useEffect(() => {
+    try {
+      const locale = navigator.language || 'en-US';
+      const region = locale.split('-')[1]?.toUpperCase();
+      if (region) {
+        const detectedCountry = COUNTRY_CODES.find(cc => cc.iso === region);
+        if (detectedCountry) setCountryData(detectedCountry);
+      }
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    const checkLimit = async () => {
+      setCheckingLimit(true);
+      const count = await getUserUploadCountToday(userEmail);
+      if (count >= 2) setLimitReached(true); 
+      setCheckingLimit(false);
+    };
+    checkLimit();
+  }, [userEmail]);
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setImageError('File size exceeds 5MB limit.');
-        return;
-      }
-
       setAnalyzingImage(true);
       setImageError('');
-      setFormData(prev => ({ ...prev, imageUrl: '' }));
       
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64 = reader.result as string;
-        
-        // 1. Safety Check
-        const safetyResult = await analyzeImageSafety(base64);
-        
-        if (!safetyResult.isSafe) {
-          setImageError(`Action Required: ${safetyResult.reason || 'Image violates safety policy.'}`);
-          setFormData(prev => ({ ...prev, imageUrl: '' }));
-          setAnalyzingImage(false);
-        } else {
+        try {
+          const compressed = await compressImage(base64);
+          
+          // البدء في تحليل الصورة فوراً
+          const safety = await analyzeImageSafety(compressed);
+          if (!safety.isSafe) {
+            setImageError('Image rejected for safety reasons.');
+            setAnalyzingImage(false);
+            return;
+          }
+
           setFormData(prev => ({ ...prev, imageUrl: base64 }));
-          
-          // 2. Image Recognition (The Magic Part)
-          setMagicFill(true);
-          const identification = await identifyProductFromImage(base64);
-          
-          if (identification) {
+
+          // Vision AI: استخراج تفاصيل المنتج
+          const info = await identifyProductFromImage(compressed);
+          if (info) {
             setFormData(prev => ({
               ...prev,
-              title: identification.title || prev.title,
-              category: (CATEGORIES.includes(identification.category as Category) ? identification.category : 'Others') as Category,
-              description: identification.description || prev.description
+              title: String(info.title || prev.title),
+              category: (CATEGORIES.includes(info.category) ? info.category : 'Others') as Category,
+              description: String(info.description || prev.description)
             }));
           }
-          
-          setMagicFill(false);
+        } catch (err) {
+          setImageError("AI could not analyze this image. Please fill details manually.");
+        } finally {
           setAnalyzingImage(false);
         }
       };
@@ -77,237 +131,125 @@ const SellProductModal: React.FC<SellProductModalProps> = ({ onClose, onAdd }) =
 
   const handleSmartDescribe = async () => {
     if (!formData.title) {
-      alert('Please enter a product title first or upload an image.');
+      setImageError('Enter title first.');
       return;
     }
     setLoading(true);
-    const desc = await generateProductDescription(formData.title, formData.category);
-    setFormData(prev => ({ ...prev, description: desc }));
+    try {
+      const desc = await generateProductDescription(formData.title, formData.category, formData.description);
+      setFormData(prev => ({ ...prev, description: desc }));
+    } catch (err) {}
     setLoading(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.imageUrl) {
-      alert('A verified safe image is required.');
-      return;
-    }
-    if (formData.description.length < 20) {
-      alert('Please provide a meaningful description.');
-      return;
-    }
-    
-    const newProduct: Product = {
-      id: Date.now().toString(),
-      title: formData.title,
-      category: formData.category,
+    if (limitReached) return;
+    if (!formData.imageUrl) { setImageError('Upload photo first.'); return; }
+    if (wordCount < 10) { setImageError('Description too short (min 10 words).'); return; }
+
+    onAdd({
+      id: String(Date.now()),
+      ...formData,
       price: Number(formData.price),
-      location: formData.location,
-      phoneNumber: formData.phoneNumber,
-      description: formData.description,
-      imageUrl: formData.imageUrl,
+      location: countryData.country,
+      phoneNumber: `${countryData.code}${formData.phoneNumber.replace(/^0+/, '')}`,
       createdAt: new Date(),
-      sellerName: 'Global User'
-    };
-    onAdd(newProduct);
+      sellerName: 'Bazaar Merchant'
+    } as any);
   };
 
+  if (checkingLimit) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-      <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-800 overflow-hidden animate-in fade-in zoom-in duration-300">
-        <div className="flex justify-between items-center p-6 border-b border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto">
+      <div className="bg-slate-900 w-full max-w-2xl rounded-[40px] shadow-2xl border border-white/5 overflow-hidden animate-in fade-in zoom-in duration-300 my-auto">
+        <div className="p-8 border-b border-white/5 flex justify-between items-center bg-slate-900/50">
           <div>
-            <h2 className="text-2xl font-black text-white">Create Listing</h2>
-            <p className="text-xs text-slate-500 mt-1">AI identifies your product & fills details automatically!</p>
+            <h2 className="text-2xl font-black text-white uppercase tracking-tight">Post Your Ad</h2>
+            <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest mt-1 flex items-center gap-2">
+               <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></span>
+               Vision AI Active
+            </p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-500 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+          <button onClick={onClose} className="p-3 bg-white/5 hover:bg-white/10 rounded-full text-slate-500 transition-all">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
-          {/* Image Upload Area */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label className="text-sm font-bold text-slate-300 flex items-center gap-2">
-                Product Image
-                <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/20">AI Visual Analysis</span>
-              </label>
-              {formData.imageUrl && !analyzingImage && (
-                <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                  Verified & Identified
-                </span>
-              )}
-            </div>
-            
+        {limitReached ? (
+          <div className="p-20 text-center">
+            <div className="text-4xl mb-4">⏳</div>
+            <h3 className="text-xl font-black text-white uppercase mb-2">Daily Limit Reached</h3>
+            <p className="text-slate-500 text-sm max-w-xs mx-auto">You can post 2 ads per day. Please return tomorrow.</p>
+            <button onClick={onClose} className="mt-8 px-8 py-4 bg-slate-800 text-white rounded-2xl font-black uppercase text-xs">Back to Market</button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar text-left">
             <div 
-              onClick={() => !analyzingImage && fileInputRef.current?.click()}
-              className={`relative h-72 w-full border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden ${
-                imageError ? 'border-red-500 bg-red-500/5' : 
-                formData.imageUrl ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-slate-700 hover:border-indigo-400 bg-slate-800/50'
-              }`}
+              onClick={() => fileInputRef.current?.click()}
+              className={`relative h-64 w-full bg-slate-800 border-2 border-dashed ${imageError ? 'border-red-500/40' : 'border-white/5'} rounded-[32px] flex items-center justify-center cursor-pointer hover:border-indigo-500/40 transition-all overflow-hidden group shadow-inner`}
             >
               {analyzingImage ? (
-                <div className="text-center space-y-4 p-8">
-                  <div className="relative w-16 h-16 mx-auto">
-                    <div className="absolute inset-0 border-4 border-indigo-500/20 rounded-full"></div>
-                    <div className="absolute inset-0 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                  <div>
-                    <p className="text-indigo-400 text-sm font-bold animate-pulse">
-                      {magicFill ? 'AI is identifying your product...' : 'Verifying safety...'}
-                    </p>
-                    <p className="text-[10px] text-slate-500 mt-2">Hang tight, we're writing your ad details!</p>
-                  </div>
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">Analyzing Visuals...</span>
                 </div>
               ) : formData.imageUrl ? (
-                <>
-                  <img src={formData.imageUrl} className="w-full h-full object-cover" alt="Preview" />
-                  <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                    <span className="bg-white text-slate-900 px-6 py-2 rounded-full font-bold text-sm shadow-xl">Change Image</span>
-                  </div>
-                </>
+                <img src={formData.imageUrl} className="w-full h-full object-cover" alt="Preview" />
               ) : (
-                <div className="text-center space-y-3 px-8">
-                  <div className={`p-5 rounded-full mx-auto w-fit transition-all duration-500 ${imageError ? 'bg-red-500/10 text-red-500' : 'bg-slate-800 text-slate-400'}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-slate-200 font-bold text-lg">Magic Image Upload</p>
-                    <p className="text-xs text-slate-500 mt-1">Upload and let AI do the rest!</p>
-                  </div>
-                  {imageError && (
-                    <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl animate-in zoom-in">
-                      <p className="text-red-400 text-xs">{imageError}</p>
-                    </div>
-                  )}
+                <div className="text-center opacity-40 group-hover:opacity-100 transition-opacity">
+                  <svg className="w-12 h-12 text-slate-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth={1.5}/></svg>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Select Product Photo</p>
                 </div>
               )}
               <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <label className="text-sm font-bold text-slate-300">Category</label>
-              <div className="relative">
-                <select 
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all appearance-none"
-                  value={formData.category}
-                  onChange={e => setFormData({...formData, category: e.target.value as Category})}
-                >
-                  {CATEGORIES.filter(c => c !== 'All').map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500">
-                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"/></svg>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Title</label>
+                  <input required className="w-full px-5 py-4 bg-slate-800/50 border border-white/5 rounded-2xl text-white font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Category</label>
+                  <select className="w-full px-5 py-4 bg-slate-800/50 border border-white/5 rounded-2xl text-white font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as Category})}>
+                    {CATEGORIES.filter(c => c !== 'All').map(cat => <option key={cat} value={cat} className="bg-slate-900">{cat}</option>)}
+                  </select>
                 </div>
               </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-bold text-slate-300">Listing Title</label>
-              <div className="relative">
-                <input 
-                  required
-                  type="text" 
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all pl-10"
-                  placeholder="e.g., iPhone 15 Pro Max"
-                  value={formData.title}
-                  onChange={e => setFormData({...formData, title: e.target.value})}
-                />
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-indigo-400">
-                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Price (USD)</label>
+                  <input required type="number" className="w-full px-5 py-4 bg-slate-800/50 border border-white/5 rounded-2xl text-white font-bold outline-none" placeholder="0" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Phone Number</label>
+                  <div className="flex gap-2">
+                    <div className="px-4 py-4 bg-slate-800/50 border border-white/5 rounded-2xl text-white text-xs font-black flex items-center">{countryData.flag} +{countryData.code}</div>
+                    <input required className="flex-1 px-5 py-4 bg-slate-800/50 border border-white/5 rounded-2xl text-white font-bold outline-none" value={formData.phoneNumber} onChange={e => setFormData({...formData, phoneNumber: e.target.value})} />
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="space-y-1">
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-sm font-bold text-slate-300">Description</label>
-              <button 
-                type="button"
-                onClick={handleSmartDescribe}
-                disabled={loading || !formData.title}
-                className="flex items-center gap-1.5 text-[10px] px-3 py-1.5 bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 rounded-lg hover:bg-indigo-600/30 font-bold transition-all disabled:opacity-30"
-              >
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" /></svg>
-                {loading ? 'AI Thinking...' : 'AI Refine Description'}
-              </button>
+              <div className="space-y-2">
+                <div className="flex justify-between px-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Description</label>
+                  <button type="button" onClick={handleSmartDescribe} disabled={loading} className="text-[9px] text-indigo-400 font-black uppercase flex items-center gap-1 hover:text-indigo-300">
+                    {loading ? <div className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div> : 'AI Rewrite'}
+                  </button>
+                </div>
+                <textarea required className="w-full px-5 py-5 bg-slate-800/50 border border-white/5 rounded-3xl text-white text-sm min-h-[150px] outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+              </div>
             </div>
-            <textarea 
-              required
-              rows={4}
-              className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none text-sm"
-              placeholder="Auto-filled from image, feel free to edit..."
-              value={formData.description}
-              onChange={e => setFormData({...formData, description: e.target.value})}
-            />
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-1">
-              <label className="text-sm font-bold text-slate-300">Asking Price ($)</label>
-              <input 
-                required
-                type="number" 
-                className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                placeholder="0.00"
-                value={formData.price}
-                onChange={e => setFormData({...formData, price: e.target.value})}
-              />
-            </div>
-            <div className="space-y-1 md:col-span-2">
-              <label className="text-sm font-bold text-slate-300">Location</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                placeholder="e.g., Dubai, UAE"
-                value={formData.location}
-                onChange={e => setFormData({...formData, location: e.target.value})}
-              />
-            </div>
-          </div>
+            {imageError && <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-[10px] font-black uppercase text-center">{imageError}</div>}
 
-          <div className="space-y-1">
-            <label className="text-sm font-bold text-slate-300">Contact Number</label>
-            <input 
-              required
-              type="tel" 
-              className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-              placeholder="+971 50 123 4567"
-              value={formData.phoneNumber}
-              onChange={e => setFormData({...formData, phoneNumber: e.target.value})}
-            />
-          </div>
-
-          <div className="pt-2">
-            <button 
-              type="submit" 
-              disabled={analyzingImage || loading}
-              className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 shadow-xl shadow-indigo-900/20 transition-all disabled:opacity-50 group"
-            >
-              {analyzingImage ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  AI Processing...
-                </span>
-              ) : (
-                'Publish Global Listing'
-              )}
-            </button>
-            <p className="text-[10px] text-slate-500 text-center mt-4">
-              AI verification ensures a safe and high-quality marketplace.
-            </p>
-          </div>
-        </form>
+            <button type="submit" className="w-full py-6 bg-indigo-600 text-white rounded-[28px] font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-700 transition-all active:scale-95">Publish Ad</button>
+          </form>
+        )}
       </div>
     </div>
   );
