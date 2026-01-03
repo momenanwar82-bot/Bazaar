@@ -1,5 +1,4 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { 
   getAuth, 
@@ -30,7 +29,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // --- Firebase Configuration ---
-// المفاتيح العامة لـ Firebase لا تشكل خطراً أمنياً، لكن مفتاح Gemini هو ما يتم تأمينه
 const firebaseConfig = {
   apiKey: "AIzaSyCMqmN36CPWc5TePfCzXTfuZGlJz90gpY8",
   authDomain: "bazaar-1c7e8.firebaseapp.com",
@@ -45,8 +43,12 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 
-// SECURITY: Gemini API is initialized using protected process.env.API_KEY
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+// --- التعديل الجوهري هنا لحل مشكلة الشاشة السوداء ---
+// نستخدم import.meta.env بدلاً من process.env لأن مشروعك يستخدم Vite
+const getAI = () => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
+  return new GoogleGenAI(apiKey);
+};
 
 export const loginUser = async (email: string, pass: string, rememberMe: boolean = true) => {
   try {
@@ -97,15 +99,13 @@ export const identifyProductFromImage = async (base64Image: string): Promise<any
   try {
     const ai = getAI();
     const data = base64Image.split(',')[1] || base64Image;
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: [{ parts: [
-        { text: "Marketplace Agent: Analyze image. Return JSON: { 'title': 'Short Title', 'category': 'Cars|Phones|Clothing|Games|Electronics|Real Estate|Furniture|Others', 'description': 'Provide a VERY detailed, high-converting professional marketing description in English (200+ words) mentioning condition, specifications, and potential value.' }" }, 
-        { inlineData: { mimeType: "image/jpeg", data } }
-      ] }],
-      config: { responseMimeType: "application/json" }
-    });
-    return JSON.parse(response.text || 'null');
+    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const response = await model.generateContent([
+      "Marketplace Agent: Analyze image. Return JSON: { 'title': 'Short Title', 'category': 'Cars|Phones|Clothing|Games|Electronics|Real Estate|Furniture|Others', 'description': 'Provide a VERY detailed, high-converting professional marketing description in English (200+ words) mentioning condition, specifications, and potential value.' }",
+      { inlineData: { mimeType: "image/jpeg", data } }
+    ]);
+    const result = await response.response;
+    return JSON.parse(result.text());
   } catch (error) { 
     console.error("AI Analysis Error:", error);
     return null; 
@@ -116,15 +116,13 @@ export const analyzeImageSafety = async (base64Image: string): Promise<{ isSafe:
   try {
     const ai = getAI();
     const data = base64Image.split(',')[1] || base64Image;
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: [{ parts: [
-        { text: "Security Gate: Is this image safe for a general marketplace? Return JSON {isSafe: boolean, reason: string}." }, 
-        { inlineData: { mimeType: "image/jpeg", data } }
-      ] }],
-      config: { responseMimeType: "application/json" }
-    });
-    return JSON.parse(response.text || '{"isSafe": true}');
+    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const response = await model.generateContent([
+      "Security Gate: Is this image safe for a general marketplace? Return JSON {isSafe: boolean, reason: string}.",
+      { inlineData: { mimeType: "image/jpeg", data } }
+    ]);
+    const result = await response.response;
+    return JSON.parse(result.text());
   } catch (error) { return { isSafe: true }; }
 };
 
@@ -176,52 +174,37 @@ export const addProductReview = async (productId: string, rating: number, userNa
 export const negotiatePrice = async (productTitle: string, originalPrice: number, offeredPrice: number): Promise<any> => {
   try {
     const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Negotiate ${productTitle} ($${originalPrice}). Buyer offered $${offeredPrice}. Be professional. Return JSON {status: 'accepted'|'counter'|'rejected', message: string}.`,
-      config: { responseMimeType: "application/json" }
-    });
-    return JSON.parse(response.text || '{}');
+    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const response = await model.generateContent(`Negotiate ${productTitle} ($${originalPrice}). Buyer offered $${offeredPrice}. Be professional. Return JSON {status: 'accepted'|'counter'|'rejected', message: string}.`);
+    const result = await response.response;
+    return JSON.parse(result.text());
   } catch (e) { return { status: 'error', message: 'Communication error.' }; }
 };
 
-// Fix: Add missing generateProductDescription export to optimize product details
 export const generateProductDescription = async (title: string, category: string, currentDesc: string): Promise<string> => {
   try {
     const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Rewrite and improve this marketplace product description. 
+    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const response = await model.generateContent(`Rewrite and improve this marketplace product description. 
       Title: ${title}
       Category: ${category}
       Current description: ${currentDesc}
-      
-      Requirements:
-      - Professional, engaging, and trustworthy tone.
-      - Highlight key features and condition.
-      - Detailed enough for a serious buyer.
-      - Return ONLY the improved description text, no preamble.`,
-    });
-    return response.text || currentDesc;
+      Requirements: Return ONLY the improved description text.`);
+    const result = await response.response;
+    return result.text();
   } catch (error) {
-    console.error("AI Rewrite Error:", error);
     return currentDesc;
   }
 };
 
-// Fix: Add missing getLiveChatResponse export to handle automated seller replies
 export const getLiveChatResponse = async (productTitle: string, userMessage: string, history: any[]): Promise<string> => {
   try {
     const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `You are the seller of "${productTitle}" on Bazaar Marketplace. 
-      A potential buyer said: "${userMessage}".
-      Provide a professional, helpful, and concise response to keep the negotiation going or answer their question.`,
-    });
-    return response.text || "Thanks for your interest! How else can I help you?";
+    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const response = await model.generateContent(`Seller assistant for "${productTitle}". Buyer says: "${userMessage}". Respond professional and helpful.`);
+    const result = await response.response;
+    return result.text();
   } catch (error) {
-    console.error("AI Chat Error:", error);
-    return "I'll get back to you as soon as possible.";
+    return "I'll get back to you soon.";
   }
 };
