@@ -23,6 +23,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onShowToast,
   currentUserEmail,
   onDelete,
+  showDeleteButton = false, 
 }) => {
   const convertedPrice = Math.round(product.price * currency.rate);
   const isOwner = currentUserEmail && product.sellerEmail && currentUserEmail === product.sellerEmail;
@@ -80,37 +81,39 @@ const ProductCard: React.FC<ProductCardProps> = ({
           loading="lazy"
         />
         
-        {/* Wishlist Button - Top Left */}
+        {/* Wishlist Button - Moved closer to edge, smaller */}
         <button
           onClick={onToggleWishlist}
-          className={`absolute top-4 left-4 p-2.5 rounded-xl backdrop-blur-xl transition-all z-10 border ${
-            isWishlisted ? 'bg-red-500 text-white border-red-400' : 'bg-black/40 text-white/70 border-white/10 hover:bg-black/60'
+          className={`absolute top-3 left-3 p-2 rounded-xl backdrop-blur-md transition-all z-10 border shadow-lg ${
+            isWishlisted ? 'bg-red-500 text-white border-red-400' : 'bg-black/30 text-white/70 border-white/5 hover:bg-black/50'
           }`}
         >
-          <svg className={`h-4 w-4 ${isWishlisted ? 'fill-current' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className={`h-3.5 w-3.5 ${isWishlisted ? 'fill-current' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
         </button>
 
-        {/* Delete "Basket" Button - Top Right - Visible ONLY to Owner */}
-        {isOwner && (
+        {/* Delete Button - Moved closer to edge, smaller */}
+        {showDeleteButton && isOwner && (
           <button
             onClick={handleDelete}
-            className="absolute top-4 right-4 p-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl backdrop-blur-xl transition-all z-10 border border-red-400 shadow-lg active:scale-90"
-            title="Remove Ad"
+            className="absolute top-3 right-3 p-2 bg-red-600/90 hover:bg-red-500 text-white rounded-xl backdrop-blur-md transition-all z-10 border border-red-400/50 shadow-lg active:scale-90"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
           </button>
         )}
-
-        <div className="absolute top-16 left-4 bg-indigo-600/80 backdrop-blur-md px-3 py-1 rounded-xl text-[7px] font-black text-white border border-white/10 z-10 uppercase tracking-widest">
-          {product.category}
-        </div>
       </div>
 
       <div className="p-5 flex flex-col flex-grow">
+        {/* Category badge moved here from top of image */}
+        <div className="mb-3">
+          <span className="inline-block px-2.5 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-lg text-[7px] font-black uppercase tracking-[0.2em]">
+            {product.category}
+          </span>
+        </div>
+
         <div className="mb-4">
           <h3 className="text-[12px] font-black text-white uppercase tracking-tight line-clamp-1 mb-1">
             {product.title}
@@ -123,13 +126,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
         <div className="mt-auto flex flex-col gap-2.5">
           <button 
             onClick={handleShareClick}
-            className="w-full py-3.5 bg-indigo-600/10 hover:bg-indigo-600/30 text-indigo-400 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 transition-all border border-indigo-500/30 uppercase tracking-[0.2em]"
+            className="w-full py-3.5 bg-indigo-600/10 hover:bg-indigo-600/30 text-indigo-400 rounded-2xl text-[9px] font-black flex items-center justify-center gap-2 transition-all border border-indigo-500/30 uppercase tracking-[0.2em]"
           >
             SHARE AD
           </button>
           <button 
             onClick={handleWhatsAppClick}
-            className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 transition-all shadow-xl active:scale-95 border border-white/10 uppercase tracking-[0.2em]"
+            className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[9px] font-black flex items-center justify-center gap-2 transition-all shadow-xl active:scale-95 border border-white/10 uppercase tracking-[0.2em]"
           >
             WHATSAPP
           </button>

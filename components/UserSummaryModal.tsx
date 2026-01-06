@@ -55,7 +55,7 @@ const UserSummaryModal: React.FC<UserSummaryModalProps> = ({
   };
 
   const renderProductGrid = (products: Product[], isOwnerMode: boolean) => (
-    <div className="grid grid-cols-2 gap-4 pb-32">
+    <div className="grid grid-cols-2 gap-3 sm:gap-6 pb-32">
       {products.map((p) => (
         <div 
           key={p.id} 
@@ -78,70 +78,76 @@ const UserSummaryModal: React.FC<UserSummaryModalProps> = ({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-950/95 backdrop-blur-2xl">
       <div 
         ref={scrollContainerRef}
-        className="bg-slate-900/40 backdrop-blur-3xl w-full max-w-2xl sm:rounded-[60px] shadow-2xl border border-white/10 overflow-y-auto overflow-x-hidden h-full sm:max-h-[94vh] flex flex-col relative custom-scrollbar scroll-smooth"
+        className="bg-slate-900/40 backdrop-blur-3xl w-full max-w-2xl sm:rounded-[50px] shadow-2xl border border-white/10 overflow-y-auto overflow-x-hidden h-full sm:max-h-[92vh] flex flex-col relative custom-scrollbar scroll-smooth"
       >
-        <div className="relative h-64 bg-gradient-to-br from-indigo-600/60 via-indigo-900/70 to-slate-950/90 shrink-0 flex items-end justify-center border-b border-white/5">
-          <button onClick={onLogout} className="absolute top-8 left-8 z-[150] p-4 bg-red-600/20 rounded-2xl text-red-500 border border-red-500/30 active:scale-90 shadow-2xl">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
-          <button onClick={onClose} className="absolute top-8 right-8 z-[150] p-4 bg-white/10 rounded-full text-white border border-white/20 active:scale-90 shadow-2xl">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-          <div className="w-32 h-32 bg-slate-900 rounded-[45px] border-[8px] border-slate-900 flex items-center justify-center translate-y-16 shadow-2xl z-[120]">
-            <div className="w-full h-full bg-indigo-600 flex items-center justify-center text-white text-5xl font-black uppercase">{user.name.charAt(0)}</div>
+        {/* Compact Header */}
+        <div className="relative p-6 sm:p-10 bg-gradient-to-br from-indigo-900/40 to-slate-950/40 border-b border-white/5 shrink-0">
+          <div className="flex justify-between items-start mb-8">
+             <button onClick={onLogout} className="p-3 bg-red-600/10 rounded-2xl text-red-500 border border-red-500/20 active:scale-90 transition-all">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+             </button>
+             <button onClick={onClose} className="p-3 bg-white/5 rounded-full text-white border border-white/10 active:scale-90 transition-all">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+             </button>
           </div>
-        </div>
-        
-        <div className="px-8 mt-24 text-center shrink-0">
-          <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-2">{user.name}</h2>
-          <div className="mt-8 bg-slate-950/40 rounded-[40px] p-6 border border-white/5">
-            <div className="flex justify-between items-center">
-              <div className="text-left">
-                <div className="text-4xl font-black text-white">{stats?.rating || '0.0'}</div>
-                <div className="text-[10px] text-slate-500 uppercase tracking-widest font-black">Merchant Rating</div>
-              </div>
-              <div className="text-right">
-                <div className="text-4xl font-black text-indigo-400">{userProducts.length}</div>
-                <div className="text-[10px] text-slate-500 uppercase tracking-widest font-black">Total Listings</div>
+
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-indigo-600 rounded-[30px] flex items-center justify-center text-white text-3xl sm:text-4xl font-black uppercase shadow-2xl border border-white/10">
+              {user.name.charAt(0)}
+            </div>
+            <div className="flex-1 text-left">
+              <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter mb-1">{user.name}</h2>
+              <div className="flex gap-4 items-center">
+                <div className="flex flex-col">
+                  <span className="text-indigo-400 font-black text-sm">{stats?.rating || '0.0'}</span>
+                  <span className="text-[7px] text-slate-500 uppercase tracking-widest font-black">Rating</span>
+                </div>
+                <div className="w-px h-6 bg-white/10"></div>
+                <div className="flex flex-col">
+                  <span className="text-white font-black text-sm">{userProducts.length}</span>
+                  <span className="text-[7px] text-slate-500 uppercase tracking-widest font-black">Ads</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="sticky top-0 z-[110] px-8 py-6 bg-slate-900/90 backdrop-blur-3xl border-b border-white/5 mt-12 flex gap-4">
+        {/* Floating Tab Bar */}
+        <div className="sticky top-0 z-[110] px-6 py-4 bg-slate-900/80 backdrop-blur-xl border-b border-white/5 flex gap-3">
             <button 
               onClick={() => setActiveTab('listings')} 
-              className={`flex-1 py-4 rounded-[25px] text-[10px] font-black uppercase tracking-widest border transition-all ${
-                activeTab === 'listings' ? 'bg-white text-black border-white shadow-lg' : 'bg-slate-800/40 text-slate-500 border-white/5'
+              className={`flex-1 py-3.5 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                activeTab === 'listings' ? 'bg-indigo-600 text-white border-indigo-400 shadow-lg shadow-indigo-900/40' : 'bg-slate-800/40 text-slate-500 border-white/5'
               }`}
             >
               MY ADS ({userProducts.length})
             </button>
             <button 
               onClick={() => setActiveTab('saved')} 
-              className={`flex-1 py-4 rounded-[25px] text-[10px] font-black uppercase tracking-widest border transition-all ${
-                activeTab === 'saved' ? 'bg-white text-black border-white shadow-lg' : 'bg-slate-800/40 text-slate-500 border-white/5'
+              className={`flex-1 py-3.5 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                activeTab === 'saved' ? 'bg-indigo-600 text-white border-indigo-400 shadow-lg shadow-indigo-900/40' : 'bg-slate-800/40 text-slate-500 border-white/5'
               }`}
             >
               SAVED ({wishlistedProducts.length})
             </button>
         </div>
 
-        <div className="p-8 space-y-8">
-            {/* The new Ad Banner Component */}
-            <AdBanner />
+        <div className="p-6 sm:p-8 space-y-6">
+            <AdBanner className="!h-[120px] !rounded-[35px]" />
 
-            {activeTab === 'listings' ? (
-                userProducts.length > 0 ? renderProductGrid(userProducts, true) : (
-                    <div className="py-24 text-center opacity-30 text-[10px] font-black uppercase tracking-[0.4em]">No active listings</div>
-                )
-            ) : (
-                wishlistedProducts.length > 0 ? renderProductGrid(wishlistedProducts, false) : (
-                    <div className="py-24 text-center opacity-30 text-[10px] font-black uppercase tracking-[0.4em]">Collection is empty</div>
-                )
-            )}
+            <div className="mt-4">
+              {activeTab === 'listings' ? (
+                  userProducts.length > 0 ? renderProductGrid(userProducts, true) : (
+                      <div className="py-24 text-center opacity-30 text-[9px] font-black uppercase tracking-[0.4em]">No active listings</div>
+                  )
+              ) : (
+                  wishlistedProducts.length > 0 ? renderProductGrid(wishlistedProducts, false) : (
+                      <div className="py-24 text-center opacity-30 text-[9px] font-black uppercase tracking-[0.4em]">Collection is empty</div>
+                  )
+              )}
+            </div>
         </div>
       </div>
     </div>
