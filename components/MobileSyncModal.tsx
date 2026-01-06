@@ -6,7 +6,8 @@ interface MobileSyncModalProps {
 }
 
 const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ onClose }) => {
-  const currentUrl = window.location.href;
+  // Use the official production URL provided by the user
+  const currentUrl = "https://bazaar-gules-three.vercel.app";
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(currentUrl)}&bgcolor=0f172a&color=6366f1`;
   const [copied, setCopied] = useState(false);
 
@@ -43,7 +44,7 @@ const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ onClose }) => {
 
           <div className="space-y-4">
             <div className="bg-slate-950/50 p-4 rounded-2xl border border-white/5 break-all">
-              <p className="text-[10px] text-indigo-400 font-mono mb-2 uppercase tracking-widest font-black">Current Live URL:</p>
+              <p className="text-[10px] text-indigo-400 font-mono mb-2 uppercase tracking-widest font-black">Official Live URL:</p>
               <div className="text-xs text-white font-medium select-all leading-relaxed bg-black/30 p-3 rounded-lg border border-white/5">
                 {currentUrl}
               </div>
@@ -62,7 +63,7 @@ const MobileSyncModal: React.FC<MobileSyncModalProps> = ({ onClose }) => {
           <div className="pt-2">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600/10 rounded-full border border-indigo-500/20">
               <span className="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></span>
-              <span className="text-[9px] text-indigo-400 font-black uppercase tracking-widest">Live Session Active</span>
+              <span className="text-[9px] text-indigo-400 font-black uppercase tracking-widest">Production Link Active</span>
             </div>
           </div>
         </div>

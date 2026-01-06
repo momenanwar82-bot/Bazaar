@@ -28,7 +28,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const convertedPrice = Math.round(product.price * currency.rate);
 
-  // شرط الملكية + شرط المكان (يظهر فقط إذا تم تمرير showDeleteButton بـ true)
   const isOwner = currentUserEmail && product.sellerEmail && currentUserEmail === product.sellerEmail;
   const canDelete = showDeleteButton && isOwner;
 
@@ -44,7 +43,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
     e.stopPropagation();
     if (!onDelete) return;
 
-    // رسالة التأكيد المطلوبة بالإنجليزية
     const confirmDelete = window.confirm("Are you sure? This ad will be permanently deleted.");
     if (confirmDelete) {
       onDelete(product.id);
@@ -53,7 +51,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   const handleShareClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const shareUrl = window.location.origin + window.location.pathname;
+    // Use official production URL instead of window.location.origin
+    const shareUrl = "https://bazaar-gules-three.vercel.app";
     const shareData = {
       title: `Bazaar: ${product.title}`,
       text: `🔥 Check out this ${product.title} on Bazaar Marketplace!\n💰 Price: ${currency.symbol}${convertedPrice.toLocaleString()}`,
@@ -89,7 +88,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
           loading="lazy"
         />
         
-        {/* زر الحذف للسلة الحمراء - يظهر فقط في My Ads ولصاحب الإعلان */}
         {canDelete && (
           <button
             onClick={handleDeleteClick}

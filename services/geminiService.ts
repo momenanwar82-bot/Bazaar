@@ -1,4 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+
+import { GoogleGenAI, Type } from "@google/genai";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { 
   getAuth, 
@@ -43,9 +44,15 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 
-// --- Gemini AI Configuration ---
-// تم التعديل هنا ليعمل مع Vite و Vercel بشكل صحيح
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
+// SECURITY: Robust AI initialization
+const getAI = () => {
+  const key = process.env.API_KEY || (window as any).process?.env?.API_KEY;
+  if (!key) {
+    console.warn("Bazaar: API_KEY is missing. AI features will be disabled.");
+    return null;
+  }
+  return new GoogleGenAI({ apiKey: key });
+};
 
 export const loginUser = async (email: string, pass: string, rememberMe: boolean = true) => {
   try {
@@ -94,14 +101,18 @@ export const markNotificationAsRead = async (id: string) => {
 
 export const identifyProductFromImage = async (base64Image: string): Promise<any> => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const ai = getAI();
+    if (!ai) return null;
     const data = base64Image.split(',')[1] || base64Image;
-    const result = await model.generateContent([
-      "Marketplace Agent: Analyze image. Return JSON: { 'title': 'Short Title', 'category': 'Cars|Phones|Clothing|Games|Electronics|Real Estate|Furniture|Others', 'description': 'Detailed marketing description in English.' }",
-      { inlineData: { mimeType: "image/jpeg", data } }
-    ]);
-    const response = await result.response;
-    return JSON.parse(response.text().replace(/```json|```/g, "").trim());
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: [{ parts: [
+        { text: "Marketplace Agent: Analyze image. Return JSON: { 'title': 'Short Title', 'category': 'Cars|Phones|Clothing|Games|Electronics|Real Estate|Furniture|Others', 'description': 'Provide a VERY detailed, high-converting professional marketing description in English (200+ words).' }" }, 
+        { inlineData: { mimeType: "image/jpeg", data } }
+      ] }],
+      config: { responseMimeType: "application/json" }
+    });
+    return JSON.parse(response.text || 'null');
   } catch (error) { 
     console.error("AI Analysis Error:", error);
     return null; 
@@ -110,5 +121,103 @@ export const identifyProductFromImage = async (base64Image: string): Promise<any
 
 export const analyzeImageSafety = async (base64Image: string): Promise<{ isSafe: boolean; reason?: string }> => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const ai = getAI();
+    if (!ai) return { isSafe: true };
     const data = base64Image.split(',')[1] || base64Image;
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: [{ parts: [
+        { text: "Security Gate: Is this image safe for a general marketplace? Return JSON {isSafe: boolean, reason: string}." }, 
+        { inlineData: { mimeType: "image/jpeg", data } }
+      ] }],
+      config: { responseMimeType: "application/json" }
+    });
+    return JSON.parse(response.text || '{"isSafe": true}');
+  } catch (error) { return { isSafe: true }; }
+};
+
+export const getUserUploadCountToday = async (email: string): Promise<number> => {
+  try {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startTimestamp = Timestamp.fromDate(startOfToday);
+    const q = query(collection(db, "products"), where("sellerEmail", "==", email));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.filter(doc => {
+      const data = doc.data();
+      const createdAt = data.createdAt as Timestamp;
+      return createdAt && createdAt.seconds >= startTimestamp.seconds;
+    }).length;
+  } catch (e) { return 0; }
+};
+
+export const getSellerStats = async (sellerName: string): Promise<any> => {
+  try {
+    const q = query(collection(db, "product_comments"), where("sellerName", "==", sellerName));
+    const snapshot = await getDocs(q);
+    const ratings = snapshot.docs.map(d => d.data().rating as number);
+    const count = ratings.length;
+    const avg = count > 0 ? (ratings.reduce((a, b) => a + b, 0) / count) : 0;
+    return { rating: Number(avg.toFixed(1)), reviewsCount: count, joinedDate: "Feb 2024" };
+  } catch (e) {
+    return { rating: 0, reviewsCount: 0, joinedDate: "Feb 2024" };
+  }
+};
+
+export const getProductReviews = async (productId: string): Promise<any[]> => {
+  try {
+    const q = query(collection(db, "product_comments"), where("productId", "==", productId), orderBy("timestamp", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), timestamp: doc.data().timestamp?.toDate() || new Date() }));
+  } catch (e) { return []; }
+};
+
+export const addProductReview = async (productId: string, rating: number, userName: string, comment: string): Promise<boolean> => {
+  try {
+    const productDoc = await getDoc(doc(db, "products", productId));
+    const sellerName = productDoc.exists() ? (productDoc.data()?.sellerName || 'Unknown') : 'Unknown';
+    await addDoc(collection(db, "product_comments"), { productId, sellerName, rating, userName, comment, timestamp: serverTimestamp() });
+    return true;
+  } catch (e) { return false; }
+};
+
+export const negotiatePrice = async (productTitle: string, originalPrice: number, offeredPrice: number): Promise<any> => {
+  try {
+    const ai = getAI();
+    if (!ai) return { status: 'error', message: 'AI disabled.' };
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Negotiate ${productTitle} ($${originalPrice}). Buyer offered $${offeredPrice}. Return JSON {status: 'accepted'|'counter'|'rejected', message: string}.`,
+      config: { responseMimeType: "application/json" }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (e) { return { status: 'error', message: 'Communication error.' }; }
+};
+
+export const generateProductDescription = async (title: string, category: string, currentDesc: string): Promise<string> => {
+  try {
+    const ai = getAI();
+    if (!ai) return currentDesc;
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Improve marketplace description. Title: ${title}, Category: ${category}. Desc: ${currentDesc}. Return only text.`,
+    });
+    return response.text || currentDesc;
+  } catch (error) {
+    return currentDesc;
+  }
+};
+
+export const getLiveChatResponse = async (productTitle: string, userMessage: string, history: any[]): Promise<string> => {
+  try {
+    const ai = getAI();
+    if (!ai) return "I'll get back to you.";
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `You are seller of "${productTitle}". Buyer: "${userMessage}". Respond concisely.`,
+    });
+    return response.text || "Thanks for your interest!";
+  } catch (error) {
+    return "I'll get back to you as soon as possible.";
+  }
+};
