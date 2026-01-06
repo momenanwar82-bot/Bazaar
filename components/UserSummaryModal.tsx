@@ -55,7 +55,7 @@ const UserSummaryModal: React.FC<UserSummaryModalProps> = ({
   };
 
   const renderProductGrid = (products: Product[], isOwnerMode: boolean) => (
-    <div className="grid grid-cols-2 gap-3 sm:gap-6 pb-32">
+    <div className="grid grid-cols-2 gap-4 sm:gap-8 pb-32">
       {products.map((p) => (
         <div 
           key={p.id} 
@@ -134,7 +134,7 @@ const UserSummaryModal: React.FC<UserSummaryModalProps> = ({
             </button>
         </div>
 
-        <div className="p-6 sm:p-8 space-y-6">
+        <div className="p-4 sm:p-8 space-y-6">
             <AdBanner className="!h-[120px] !rounded-[35px]" />
 
             <div className="mt-4">

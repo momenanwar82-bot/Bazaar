@@ -9,6 +9,7 @@ import SellProductModal from './components/SellProductModal';
 import ProductDetailModal from './components/ProductDetailModal';
 import LoginModal from './components/LoginModal';
 import UserSummaryModal from './components/UserSummaryModal';
+import UserProfileModal from './components/UserProfileModal'; 
 import Footer from './components/Footer';
 import AdBanner from './components/AdBanner';
 import { PrivacyModal, TermsModal, ContactModal } from './components/LegalModals';
@@ -39,6 +40,7 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const [viewingSellerName, setViewingSellerName] = useState<string | null>(null); 
   const [summaryInitialTab, setSummaryInitialTab] = useState<'listings' | 'saved' | 'alerts'>('listings');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
@@ -272,12 +274,25 @@ const App: React.FC = () => {
       <Footer onOpenPrivacy={() => setShowPrivacy(true)} onOpenTerms={() => setShowTerms(true)} onOpenContact={() => setShowContact(true)} onOpenSell={() => setIsSellModalOpen(true)} />
 
       {isSellModalOpen && <SellProductModal onClose={() => setIsSellModalOpen(false)} onAdd={handleAddProduct} userEmail={user.email} />}
+      
       {selectedProduct && <ProductDetailModal 
         product={selectedProduct} onClose={() => setSelectedProduct(null)} 
         isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={() => toggleWishlist(selectedProduct.id)} 
-        onViewProfile={() => {}} currency={selectedCurrency} currentUserEmail={user.email} currentUserName={user.name} 
+        onViewProfile={(sellerName) => setViewingSellerName(sellerName)} currency={selectedCurrency} currentUserEmail={user.email} currentUserName={user.name} 
         onDeleteProduct={handleDeleteProduct} onShowToast={showToast} 
       />}
+
+      {viewingSellerName && (
+        <UserProfileModal 
+          sellerName={viewingSellerName} 
+          allProducts={products} 
+          onClose={() => setViewingSellerName(null)}
+          onProductClick={(p) => setSelectedProduct(p)}
+          onStartChat={() => {}} 
+          currency={selectedCurrency}
+        />
+      )}
+
       {isSummaryModalOpen && (
         <UserSummaryModal 
           user={user} userProducts={products.filter(p => p.sellerEmail === user.email)} 
