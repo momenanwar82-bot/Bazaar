@@ -1,8 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Category, Product } from '../types';
-import { CATEGORIES, COUNTRY_CODES } from '../constants';
+import { Category, Product, CurrencyCode } from '../types';
+import { CATEGORIES, COUNTRY_CODES, CURRENCIES } from '../constants';
 import { generateProductDescription, analyzeImageSafety, identifyProductFromImage, getUserUploadCountToday } from '../services/geminiService';
+import AdBanner from './AdBanner';
 
 interface SellProductModalProps {
   onClose: () => void;
@@ -10,16 +11,30 @@ interface SellProductModalProps {
   userEmail: string;
 }
 
+// Map ISO country codes to their respective currency codes
+const COUNTRY_TO_CURRENCY: Record<string, CurrencyCode> = {
+  'EG': 'EGP',
+  'SA': 'SAR',
+  'AE': 'AED',
+  'US': 'USD',
+  'ES': 'EUR',
+  'MA': 'AED', // Simplified mapping for other countries
+  'DZ': 'AED',
+  'IQ': 'SAR',
+  'CN': 'USD',
+  'IN': 'USD',
+  'ID': 'USD',
+  'PK': 'USD'
+};
+
 const SellProductModal: React.FC<SellProductModalProps> = ({ onClose, onAdd, userEmail }) => {
   const [loading, setLoading] = useState(false);
   const [analyzingImage, setAnalyzingImage] = useState(false);
   const [imageError, setImageError] = useState('');
   const [limitReached, setLimitReached] = useState(false);
   const [checkingLimit, setCheckingLimit] = useState(true);
-  const [showCountrySearch, setShowCountrySearch] = useState(false);
-  const [countrySearchQuery, setCountrySearchQuery] = useState('');
+  const [timeLeft, setTimeLeft] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const countryDropdownRef = useRef<HTMLDivElement>(null);
   
   const [countryData, setCountryData] = useState(COUNTRY_CODES[0]);
   const [formData, setFormData] = useState({
@@ -32,50 +47,49 @@ const SellProductModal: React.FC<SellProductModalProps> = ({ onClose, onAdd, use
     imageUrl: ''
   });
 
-  const wordCount = formData.description.trim() === '' ? 0 : formData.description.trim().split(/\s+/).length;
-  const isDescriptionShort = wordCount > 0 && wordCount < 10;
+  // Detect local currency based on selected country
+  const localCurrency = CURRENCIES.find(c => c.code === COUNTRY_TO_CURRENCY[countryData.iso]) || CURRENCIES[0];
 
-  // ضغط الصورة لضمان استجابة لحظية من Gemini ومنع تعليق المتصفح
+  const wordCount = formData.description.trim() === '' ? 0 : formData.description.trim().split(/\s+/).length;
+
+  useEffect(() => {
+    if (!limitReached) return;
+    const calculateTimeLeft = () => {
+      const now = new Date();
+      const tomorrow = new Date();
+      tomorrow.setHours(24, 0, 0, 0);
+      const diff = tomorrow.getTime() - now.getTime();
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / 1000 / 60) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    };
+    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000);
+    setTimeLeft(calculateTimeLeft());
+    return () => clearInterval(timer);
+  }, [limitReached]);
+
   const compressImage = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.src = base64Str;
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_SIZE = 700; // حجم مثالي للرؤية
+        const MAX_SIZE = 700;
         let width = img.width;
         let height = img.height;
-
         if (width > height) {
-          if (width > MAX_SIZE) {
-            height *= MAX_SIZE / width;
-            width = MAX_SIZE;
-          }
+          if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
         } else {
-          if (height > MAX_SIZE) {
-            width *= MAX_SIZE / height;
-            height = MAX_SIZE;
-          }
+          if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
         }
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.6)); // ضغط متوسط للسرعة
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
       };
     });
   };
-
-  useEffect(() => {
-    try {
-      const locale = navigator.language || 'en-US';
-      const region = locale.split('-')[1]?.toUpperCase();
-      if (region) {
-        const detectedCountry = COUNTRY_CODES.find(cc => cc.iso === region);
-        if (detectedCountry) setCountryData(detectedCountry);
-      }
-    } catch (e) {}
-  }, []);
 
   useEffect(() => {
     const checkLimit = async () => {
@@ -92,24 +106,18 @@ const SellProductModal: React.FC<SellProductModalProps> = ({ onClose, onAdd, use
     if (file) {
       setAnalyzingImage(true);
       setImageError('');
-      
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64 = reader.result as string;
         try {
           const compressed = await compressImage(base64);
-          
-          // البدء في تحليل الصورة فوراً
           const safety = await analyzeImageSafety(compressed);
           if (!safety.isSafe) {
             setImageError('Image rejected for safety reasons.');
             setAnalyzingImage(false);
             return;
           }
-
           setFormData(prev => ({ ...prev, imageUrl: base64 }));
-
-          // Vision AI: استخراج تفاصيل المنتج
           const info = await identifyProductFromImage(compressed);
           if (info) {
             setFormData(prev => ({
@@ -120,7 +128,7 @@ const SellProductModal: React.FC<SellProductModalProps> = ({ onClose, onAdd, use
             }));
           }
         } catch (err) {
-          setImageError("AI could not analyze this image. Please fill details manually.");
+          setImageError("AI could not analyze this image.");
         } finally {
           setAnalyzingImage(false);
         }
@@ -129,29 +137,20 @@ const SellProductModal: React.FC<SellProductModalProps> = ({ onClose, onAdd, use
     }
   };
 
-  const handleSmartDescribe = async () => {
-    if (!formData.title) {
-      setImageError('Enter title first.');
-      return;
-    }
-    setLoading(true);
-    try {
-      const desc = await generateProductDescription(formData.title, formData.category, formData.description);
-      setFormData(prev => ({ ...prev, description: desc }));
-    } catch (err) {}
-    setLoading(false);
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (limitReached) return;
     if (!formData.imageUrl) { setImageError('Upload photo first.'); return; }
     if (wordCount < 10) { setImageError('Description too short (min 10 words).'); return; }
 
+    // Convert price to USD before saving if necessary, or keep as is if app expects base currency
+    // For this marketplace, we assume the input is converted to USD based on the detected local rate
+    const priceInUSD = Number(formData.price) / localCurrency.rate;
+
     onAdd({
       id: String(Date.now()),
       ...formData,
-      price: Number(formData.price),
+      price: priceInUSD,
       location: countryData.country,
       phoneNumber: `${countryData.code}${formData.phoneNumber.replace(/^0+/, '')}`,
       createdAt: new Date(),
@@ -178,11 +177,21 @@ const SellProductModal: React.FC<SellProductModalProps> = ({ onClose, onAdd, use
         </div>
 
         {limitReached ? (
-          <div className="p-20 text-center">
-            <div className="text-4xl mb-4">⏳</div>
-            <h3 className="text-xl font-black text-white uppercase mb-2">Daily Limit Reached</h3>
-            <p className="text-slate-500 text-sm max-w-xs mx-auto">You can post 2 ads per day. Please return tomorrow.</p>
-            <button onClick={onClose} className="mt-8 px-8 py-4 bg-slate-800 text-white rounded-2xl font-black uppercase text-xs">Back to Market</button>
+          <div className="p-10 sm:p-20 text-center space-y-10">
+            <div className="space-y-4">
+              <div className="text-6xl animate-bounce">⏳</div>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Daily Limit Reached</h3>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] max-w-xs mx-auto leading-relaxed">
+                You have reached your 2-ad limit for today. Next slot opens in:
+              </p>
+              <div className="inline-block px-10 py-5 bg-indigo-600/10 border border-indigo-500/20 rounded-[30px] shadow-2xl">
+                <span className="text-4xl font-black text-indigo-400 font-mono tracking-widest">{timeLeft}</span>
+              </div>
+            </div>
+            <div className="pt-4 border-t border-white/5">
+              <AdBanner className="!h-[140px] !rounded-[35px] !bg-indigo-950/20" />
+            </div>
+            <button onClick={onClose} className="w-full py-5 bg-slate-800 text-white rounded-[24px] font-black uppercase text-[10px] tracking-[0.2em] hover:bg-slate-700 transition-all shadow-xl">Back to Market</button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar text-left">
@@ -222,25 +231,33 @@ const SellProductModal: React.FC<SellProductModalProps> = ({ onClose, onAdd, use
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Price (USD)</label>
-                  <input required type="number" className="w-full px-5 py-4 bg-slate-800/50 border border-white/5 rounded-2xl text-white font-bold outline-none" placeholder="0" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                    Price ({localCurrency.code})
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400 font-bold">{localCurrency.symbol}</span>
+                    <input required type="number" className="w-full pl-10 pr-5 py-4 bg-slate-800/50 border border-white/5 rounded-2xl text-white font-bold outline-none" placeholder="0" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
+                  </div>
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Phone Number</label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Phone & Country</label>
                   <div className="flex gap-2">
-                    <div className="px-4 py-4 bg-slate-800/50 border border-white/5 rounded-2xl text-white text-xs font-black flex items-center">{countryData.flag} +{countryData.code}</div>
-                    <input required className="flex-1 px-5 py-4 bg-slate-800/50 border border-white/5 rounded-2xl text-white font-bold outline-none" value={formData.phoneNumber} onChange={e => setFormData({...formData, phoneNumber: e.target.value})} />
+                    <select 
+                      className="px-2 py-4 bg-slate-800/50 border border-white/5 rounded-2xl text-white text-[10px] font-black outline-none flex items-center justify-center min-w-[100px]"
+                      value={countryData.iso}
+                      onChange={(e) => setCountryData(COUNTRY_CODES.find(c => c.iso === e.target.value) || COUNTRY_CODES[0])}
+                    >
+                      {COUNTRY_CODES.map(c => (
+                        <option key={c.iso} value={c.iso} className="bg-slate-900">{c.flag} +{c.code}</option>
+                      ))}
+                    </select>
+                    <input required className="flex-1 px-5 py-4 bg-slate-800/50 border border-white/5 rounded-2xl text-white font-bold outline-none" placeholder="Mobile Number" value={formData.phoneNumber} onChange={e => setFormData({...formData, phoneNumber: e.target.value})} />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <div className="flex justify-between px-1">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Description</label>
-                  <button type="button" onClick={handleSmartDescribe} disabled={loading} className="text-[9px] text-indigo-400 font-black uppercase flex items-center gap-1 hover:text-indigo-300">
-                    {loading ? <div className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div> : 'AI Rewrite'}
-                  </button>
-                </div>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Description (Min 10 Words)</label>
                 <textarea required className="w-full px-5 py-5 bg-slate-800/50 border border-white/5 rounded-3xl text-white text-sm min-h-[150px] outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
               </div>
             </div>

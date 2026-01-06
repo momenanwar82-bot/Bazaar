@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { Product, Currency } from '../types';
-import { COUNTRY_CODES } from '../constants';
 
 interface ProductCardProps {
   product: Product;
@@ -24,12 +23,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onShowToast,
   currentUserEmail,
   onDelete,
-  showDeleteButton = false
 }) => {
   const convertedPrice = Math.round(product.price * currency.rate);
-
   const isOwner = currentUserEmail && product.sellerEmail && currentUserEmail === product.sellerEmail;
-  const canDelete = showDeleteButton && isOwner;
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete && window.confirm("Are you sure you want to remove this ad?")) {
+      onDelete(product.id);
+    }
+  };
 
   const handleWhatsAppClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -37,16 +40,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
     if (digits.startsWith('0')) digits = '20' + digits.substring(1);
     const message = encodeURIComponent(`Hi, I'm interested in: ${product.title}`);
     window.open(`https://wa.me/${digits}?text=${message}`, '_blank');
-  };
-
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!onDelete) return;
-
-    const confirmDelete = window.confirm("Are you sure? This ad will be permanently deleted.");
-    if (confirmDelete) {
-      onDelete(product.id);
-    }
   };
 
   const handleShareClick = async (e: React.MouseEvent) => {
@@ -87,19 +80,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           loading="lazy"
         />
         
-        {/* Premium Red Trash Can - Visible Only to Owner */}
-        {canDelete && (
-          <button
-            onClick={handleDeleteClick}
-            className="absolute top-4 right-4 p-3 rounded-2xl bg-red-600/90 backdrop-blur-md border border-red-400/50 text-white shadow-[0_0_20px_rgba(220,38,38,0.5)] z-30 hover:bg-red-500 hover:scale-110 active:scale-90 transition-all group/delete"
-            title="Delete Listing"
-          >
-            <svg className="w-5 h-5 drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        )}
-
+        {/* Wishlist Button - Top Left */}
         <button
           onClick={onToggleWishlist}
           className={`absolute top-4 left-4 p-2.5 rounded-xl backdrop-blur-xl transition-all z-10 border ${
@@ -110,6 +91,19 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
         </button>
+
+        {/* Delete "Basket" Button - Top Right - Visible ONLY to Owner */}
+        {isOwner && (
+          <button
+            onClick={handleDelete}
+            className="absolute top-4 right-4 p-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl backdrop-blur-xl transition-all z-10 border border-red-400 shadow-lg active:scale-90"
+            title="Remove Ad"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        )}
 
         <div className="absolute top-16 left-4 bg-indigo-600/80 backdrop-blur-md px-3 py-1 rounded-xl text-[7px] font-black text-white border border-white/10 z-10 uppercase tracking-widest">
           {product.category}

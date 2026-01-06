@@ -58,9 +58,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const handleWhatsAppClick = () => {
     let digits = product.phoneNumber.replace(/\D/g, '');
-    if (digits.startsWith('0')) {
-      digits = '20' + digits.substring(1);
-    }
+    if (digits.startsWith('0')) { digits = '20' + digits.substring(1); }
     const message = encodeURIComponent(`Hi, I'm interested in your product: ${product.title}`);
     window.open(`https://wa.me/${digits}?text=${message}`, '_blank');
   };
@@ -74,11 +72,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     };
 
     if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        console.error("Share failed:", err);
-      }
+      try { await navigator.share(shareData); } catch (err) { console.error("Share failed:", err); }
     } else {
       try {
         await navigator.clipboard.writeText(shareUrl);
@@ -97,10 +91,8 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       return;
     }
     if (isOwner) return;
-
     setIsSubmittingReview(true);
     const result = await addProductReview(product.id, reviewRating, currentUserName || 'Bazzarian', reviewComment);
-    
     if (result) {
       const updatedReviews = await getProductReviews(product.id);
       setReviews(updatedReviews);
@@ -212,29 +204,22 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           <div className="pt-10 pb-20 border-t border-white/5">
              <div className="flex flex-col gap-8">
-                {isOwner ? (
-                  <div className="w-full animate-in fade-in slide-in-from-bottom-5 duration-700">
-                    <AdBanner className="!h-[150px] !rounded-[35px] shadow-indigo-900/10" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <button onClick={() => setShowNegotiation(true)} className="flex-1 py-6 bg-slate-800 text-white rounded-[28px] font-black text-[11px] border border-slate-700 hover:bg-slate-700 transition-all uppercase tracking-widest shadow-xl">NEGOTIATE PRICE</button>
-                        <div className="flex-1 flex gap-3">
-                            <button onClick={handleWhatsAppClick} className="flex-[2] py-6 bg-emerald-600 text-white rounded-[28px] font-black text-[11px] hover:bg-emerald-700 transition-all uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-[0_20px_40px_rgba(16,185,129,0.3)]">
-                                <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.246 2.248 3.484 5.232 3.484 8.412-.003 6.557-5.338 11.892-11.893 11.892-1.997-.001-3.951-.5-5.688-1.448l-6.309 1.656zm6.29-4.143c1.565.933 3.176 1.423 4.842 1.425 5.463 0 9.908-4.447 9.91-9.91.001-2.646-1.027-5.133-2.897-7.004-1.87-1.871-4.358-2.9-7.006-2.901-5.465 0-9.91 4.444-9.912 9.908-.001 1.748.459 3.456 1.321 4.956l-1.02 3.723 3.822-1.001zm11.766-7.341c-.26-.13-1.534-.757-1.772-.843-.238-.087-.412-.13-.584.13-.172.26-.665.843-.815 1.017-.15.173-.3.194-.56.065-.26-.13-1.097-.404-2.09-1.288-.771-.688-1.292-1.538-1.443-1.798-.15-.26-.016-.4.114-.53.117-.118.26-.304.39-.455.13-.152.174-.26.26-.433.087-.173.044-.325-.022-.455-.065-.13-.584-1.408-.8-1.928-.211-.507-.425-.437-.584-.445-.15-.007-.323-.008-.497-.008-.174 0-.455.065-.693.325-.238.26-.91.888-.91 2.166 0 1.278.93 2.515 1.06 2.688.13.174 1.828 2.79 4.429 3.912.619.267 1.1.427 1.477.547.622.197 1.187.17 1.634.103.498-.074 1.534-.627 1.751-1.234.217-.607.217-1.127.152-1.234-.065-.108-.239-.174-.499-.304z"/></svg>
-                                WHATSAPP
-                            </button>
-                            <button onClick={handleShare} className="flex-1 py-6 bg-indigo-600/10 text-indigo-400 rounded-[28px] font-black border border-indigo-500/20 hover:bg-indigo-600/20 transition-all flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-                            </button>
-                        </div>
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <button onClick={() => setShowNegotiation(true)} className="flex-1 py-6 bg-slate-800 text-white rounded-[28px] font-black text-[11px] border border-slate-700 hover:bg-slate-700 transition-all uppercase tracking-widest shadow-xl">NEGOTIATE PRICE</button>
+                    <div className="flex-1 flex gap-3">
+                        <button onClick={handleWhatsAppClick} className="flex-[2] py-6 bg-emerald-600 text-white rounded-[28px] font-black text-[11px] hover:bg-emerald-700 transition-all uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-[0_20px_40px_rgba(16,185,129,0.3)]">
+                            <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.246 2.248 3.484 5.232 3.484 8.412-.003 6.557-5.338 11.892-11.893 11.892-1.997-.001-3.951-.5-5.688-1.448l-6.309 1.656zm6.29-4.143c1.565.933 3.176 1.423 4.842 1.425 5.463 0 9.908-4.447 9.91-9.91.001-2.646-1.027-5.133-2.897-7.004-1.87-1.871-4.358-2.9-7.006-2.901-5.465 0-9.91 4.444-9.912 9.908-.001 1.748.459 3.456 1.321 4.956l-1.02 3.723 3.822-1.001zm11.766-7.341c-.26-.13-1.534-.757-1.772-.843-.238-.087-.412-.13-.584.13-.172.26-.665.843-.815 1.017-.15.173-.3.194-.56.065-.26-.13-1.097-.404-2.09-1.288-.771-.688-1.292-1.538-1.443-1.798-.15-.26-.016-.4.114-.53.117-.118.26-.304.39-.455.13-.152.174-.26.26-.433.087-.173.044-.325-.022-.455-.065-.13-.584-1.408-.8-1.928-.211-.507-.425-.437-.584-.445-.15-.007-.323-.008-.497-.008-.174 0-.455.065-.693.325-.238.26-.91.888-.91 2.166 0 1.278.93 2.515 1.06 2.688.13.174 1.828 2.79 4.429 3.912.619.267 1.1.427 1.477.547.622.197 1.187.17 1.634.103.498-.074 1.534-.627 1.751-1.234.217-.607.217-1.127.152-1.234-.065-.108-.239-.174-.499-.304z"/></svg>
+                            WHATSAPP
+                        </button>
+                        <button onClick={handleShare} className="flex-1 py-6 bg-indigo-600/10 text-indigo-400 rounded-[28px] font-black border border-indigo-500/20 hover:bg-indigo-600/20 transition-all flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                        </button>
                     </div>
-                    <div className="w-full">
-                      <AdBanner className="!h-[100px] !rounded-[25px]" />
-                    </div>
-                  </>
-                )}
+                </div>
+                {/* Trash can replaced by AdBanner */}
+                <div className="w-full mt-4">
+                  <AdBanner className="!h-[120px] !rounded-[30px]" />
+                </div>
              </div>
           </div>
         </div>
@@ -286,18 +271,8 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <button key={star} type="button" onClick={() => setReviewRating(star)} className={`text-4xl transition-all ${star <= reviewRating ? 'text-amber-400 scale-125 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)]' : 'text-slate-800'}`}>★</button>
                   ))}
                 </div>
-                <textarea 
-                  required
-                  placeholder="Share your thoughts on this product..."
-                  className="w-full p-6 bg-slate-800 border border-white/5 rounded-[32px] text-white text-sm min-h-[160px] outline-none focus:border-indigo-500 transition-all resize-none leading-relaxed"
-                  value={reviewComment}
-                  onChange={e => setReviewComment(e.target.value)}
-                />
-                {authError && (
-                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
-                    <p className="text-red-400 text-[10px] font-black uppercase tracking-widest">{authError}</p>
-                  </div>
-                )}
+                <textarea required placeholder="Share your thoughts on this product..." className="w-full p-6 bg-slate-800 border border-white/5 rounded-[32px] text-white text-sm min-h-[160px] outline-none focus:border-indigo-500 transition-all resize-none leading-relaxed" value={reviewComment} onChange={e => setReviewComment(e.target.value)} />
+                {authError && <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center"><p className="text-red-400 text-[10px] font-black uppercase tracking-widest">{authError}</p></div>}
                 <button disabled={isSubmittingReview} type="submit" className="w-full py-5 bg-indigo-600 text-white rounded-[24px] font-black uppercase shadow-lg shadow-indigo-900/40 transition-all active:scale-95 flex items-center justify-center gap-3">
                   {isSubmittingReview ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : 'POST REVIEW'}
                 </button>
