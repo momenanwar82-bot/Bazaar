@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { 
   getAuth, 
@@ -44,14 +44,10 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 
-// SECURITY: Robust AI initialization
+// Initializes a new GoogleGenAI instance using the environment variable.
 const getAI = () => {
-  const key = process.env.API_KEY || (window as any).process?.env?.API_KEY;
-  if (!key) {
-    console.warn("Bazaar: API_KEY is missing. AI features will be disabled.");
-    return null;
-  }
-  return new GoogleGenAI({ apiKey: key });
+  if (!process.env.API_KEY) return null;
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 export const loginUser = async (email: string, pass: string, rememberMe: boolean = true) => {
@@ -83,10 +79,7 @@ export const registerUser = async (email: string, pass: string, name: string) =>
 export const logoutUser = () => signOut(auth);
 
 export const saveProductToDB = async (p: any) => { 
-  const cleanData = {
-    ...p,
-    createdAt: serverTimestamp() 
-  };
+  const cleanData = { ...p, createdAt: serverTimestamp() };
   const docRef = await addDoc(collection(db, "products"), cleanData); 
   return docRef.id; 
 };
@@ -99,6 +92,7 @@ export const markNotificationAsRead = async (id: string) => {
   await updateDoc(doc(db, "notifications", id), { isRead: true }); 
 };
 
+// Uses Gemini to generate product title and description from an image
 export const identifyProductFromImage = async (base64Image: string): Promise<any> => {
   try {
     const ai = getAI();
@@ -107,18 +101,16 @@ export const identifyProductFromImage = async (base64Image: string): Promise<any
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: [{ parts: [
-        { text: "Marketplace Agent: Analyze image. Return JSON: { 'title': 'Short Title', 'category': 'Cars|Phones|Clothing|Games|Electronics|Real Estate|Furniture|Others', 'description': 'Provide a VERY detailed, high-converting professional marketing description in English (200+ words).' }" }, 
+        { text: "Identity this product from the photo. Provide a catchy title and a high-converting professional marketing description. Return ONLY JSON: { 'title': 'Name', 'category': 'Cars|Phones|Clothing|Jewelry|Watches|Accessories|Real Estate|Games|Electronics|Furniture|Others', 'description': 'Full marketing pitch' }. Note: Jewelry includes Gold, Diamonds, Rings. Watches covers luxury and smart watches." }, 
         { inlineData: { mimeType: "image/jpeg", data } }
       ] }],
       config: { responseMimeType: "application/json" }
     });
     return JSON.parse(response.text || 'null');
-  } catch (error) { 
-    console.error("AI Analysis Error:", error);
-    return null; 
-  }
+  } catch (error) { return null; }
 };
 
+// Uses Gemini to determine if an image is safe for the marketplace
 export const analyzeImageSafety = async (base64Image: string): Promise<{ isSafe: boolean; reason?: string }> => {
   try {
     const ai = getAI();
@@ -127,7 +119,7 @@ export const analyzeImageSafety = async (base64Image: string): Promise<{ isSafe:
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: [{ parts: [
-        { text: "Security Gate: Is this image safe for a general marketplace? Return JSON {isSafe: boolean, reason: string}." }, 
+        { text: "Is this image safe for a marketplace? Return JSON {isSafe: boolean, reason: string}." }, 
         { inlineData: { mimeType: "image/jpeg", data } }
       ] }],
       config: { responseMimeType: "application/json" }
@@ -159,9 +151,7 @@ export const getSellerStats = async (sellerName: string): Promise<any> => {
     const count = ratings.length;
     const avg = count > 0 ? (ratings.reduce((a, b) => a + b, 0) / count) : 0;
     return { rating: Number(avg.toFixed(1)), reviewsCount: count, joinedDate: "Feb 2024" };
-  } catch (e) {
-    return { rating: 0, reviewsCount: 0, joinedDate: "Feb 2024" };
-  }
+  } catch (e) { return { rating: 0, reviewsCount: 0, joinedDate: "Feb 2024" }; }
 };
 
 export const getProductReviews = async (productId: string): Promise<any[]> => {
@@ -181,43 +171,23 @@ export const addProductReview = async (productId: string, rating: number, userNa
   } catch (e) { return false; }
 };
 
-export const negotiatePrice = async (productTitle: string, originalPrice: number, offeredPrice: number): Promise<any> => {
-  try {
-    const ai = getAI();
-    if (!ai) return { status: 'error', message: 'AI disabled.' };
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Negotiate ${productTitle} ($${originalPrice}). Buyer offered $${offeredPrice}. Return JSON {status: 'accepted'|'counter'|'rejected', message: string}.`,
-      config: { responseMimeType: "application/json" }
-    });
-    return JSON.parse(response.text || '{}');
-  } catch (e) { return { status: 'error', message: 'Communication error.' }; }
-};
-
-export const generateProductDescription = async (title: string, category: string, currentDesc: string): Promise<string> => {
-  try {
-    const ai = getAI();
-    if (!ai) return currentDesc;
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Improve marketplace description. Title: ${title}, Category: ${category}. Desc: ${currentDesc}. Return only text.`,
-    });
-    return response.text || currentDesc;
-  } catch (error) {
-    return currentDesc;
-  }
-};
-
 export const getLiveChatResponse = async (productTitle: string, userMessage: string, history: any[]): Promise<string> => {
   try {
     const ai = getAI();
-    if (!ai) return "I'll get back to you.";
+    if (!ai) return "Service unavailable.";
+
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `You are seller of "${productTitle}". Buyer: "${userMessage}". Respond concisely.`,
+      contents: `Product Context: "${productTitle}"\nBuyer Inquiry: "${userMessage}"`,
+      config: {
+        systemInstruction: `You are a helpful and professional seller on the Bazaar marketplace. Respond to the buyer's inquiry about your item: "${productTitle}". 
+        Be concise, friendly, and act as a human seller would. Focus on helping the buyer and providing accurate information based on the context.`
+      }
     });
-    return response.text || "Thanks for your interest!";
+
+    return response.text || "I'm sorry, I'm not sure how to answer that. Could you please clarify?";
   } catch (error) {
-    return "I'll get back to you as soon as possible.";
+    console.error("Gemini Chat Error:", error);
+    return "The seller is currently unavailable.";
   }
 };

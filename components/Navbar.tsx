@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Currency, SellerNotification } from '../types';
+import { SellerNotification } from '../types';
 import NotificationDropdown from './NotificationDropdown';
 import MobileSyncModal from './MobileSyncModal';
 
@@ -20,8 +20,6 @@ interface NavbarProps {
   onMarkAsRead: (id: string) => void;
   onClearAll: () => void;
   onViewMyProfile: () => void;
-  selectedCurrency: Currency;
-  onCurrencyChange: (currency: Currency) => void;
   remainingAds: number;
   searchSuggestions?: string[];
 }
@@ -92,9 +90,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
               {/* Triangular Action Cluster */}
               <div className="flex items-center gap-1.5 p-1 bg-white/5 rounded-2xl border border-white/5">
-                {/* Column 1: Vertical Stack */}
                 <div className="flex flex-col gap-1">
-                  {/* Notifications */}
                   <div className="relative">
                     <button
                       onClick={() => setShowNotifMenu(!showNotifMenu)}
@@ -115,7 +111,6 @@ const Navbar: React.FC<NavbarProps> = ({
                       />
                     )}
                   </div>
-                  {/* Favorites */}
                   <button
                     onClick={onToggleFavorites}
                     className={`p-1.5 bg-slate-950 border border-white/10 rounded-lg transition-all active:scale-90 ${
@@ -128,13 +123,12 @@ const Navbar: React.FC<NavbarProps> = ({
                   </button>
                 </div>
 
-                {/* Column 2: Large Mobile Sync */}
                 <button 
                   onClick={() => setShowSyncModal(true)}
                   className="p-3 bg-indigo-600 rounded-xl text-white hover:bg-indigo-500 transition-all active:scale-90 shadow-lg shadow-indigo-600/20"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 00-2 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 00-2 2z" />
                   </svg>
                 </button>
               </div>
@@ -183,19 +177,6 @@ const Navbar: React.FC<NavbarProps> = ({
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            {searchSuggestions.length > 0 && (
-              <div className="w-full mt-2 bg-slate-900 border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
-                {searchSuggestions.map((suggestion, idx) => (
-                  <button 
-                    key={idx}
-                    onClick={() => handleSelectSuggestion(suggestion)}
-                    className="w-full px-6 py-4 text-left text-[10px] font-black text-slate-300 uppercase tracking-widest hover:bg-white/5 hover:text-white transition-colors border-b border-white/5 last:border-0"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </nav>

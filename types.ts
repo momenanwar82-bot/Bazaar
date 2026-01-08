@@ -1,14 +1,5 @@
 
-export type Category = 'All' | 'Cars' | 'Phones' | 'Clothing' | 'Games' | 'Electronics' | 'Real Estate' | 'Furniture' | 'Others';
-
-export type CurrencyCode = 'USD' | 'SAR' | 'AED' | 'EGP' | 'EUR';
-
-export interface Currency {
-  code: CurrencyCode;
-  symbol: string;
-  rate: number; // Rate relative to USD
-  label: string;
-}
+export type Category = 'All' | 'Cars' | 'Phones' | 'Clothing' | 'Jewelry' | 'Watches' | 'Accessories' | 'Real Estate' | 'Games' | 'Electronics' | 'Furniture' | 'Others';
 
 export interface Review {
   id: string;
@@ -22,14 +13,15 @@ export interface Product {
   id: string;
   title: string;
   description: string;
-  price: number; // Always stored in USD
+  price: number; 
+  currency: string; // The seller types this manually (e.g., "E£", "SR", "$")
   category: Category;
   imageUrl: string;
   location: string;
   createdAt: Date;
-  postDate?: string; // Format: YYYY/MM/DD
+  postDate?: string; 
   sellerName: string;
-  sellerEmail?: string; // Links product to a specific registered account
+  sellerEmail?: string; 
   phoneNumber: string;
   rating?: number;
   reviewsCount?: number;
@@ -46,21 +38,21 @@ export interface SellerNotification {
   isRead: boolean;
 }
 
+// ChatMessage represents a single message in a conversation thread
 export interface ChatMessage {
-  id: string;
   sender: string;
   text: string;
   timestamp: Date;
-  status?: 'sending' | 'sent' | 'read';
+  status?: 'sent' | 'read';
 }
 
+// Chat represents a conversation thread between a buyer and a seller for a specific product
 export interface Chat {
   id: string;
-  productId: string;
+  sellerName: string;
   productTitle: string;
   productImage: string;
-  sellerName: string;
   lastMessage: string;
-  messages: ChatMessage[];
   unread: boolean;
+  messages: ChatMessage[];
 }

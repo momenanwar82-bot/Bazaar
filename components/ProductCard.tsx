@@ -1,17 +1,17 @@
 
 import React from 'react';
-import { Product, Currency } from '../types';
+import { Product } from '../types';
 
 interface ProductCardProps {
   product: Product;
   onClick: () => void;
   isWishlisted?: boolean;
   onToggleWishlist?: (e: React.MouseEvent) => void;
-  currency: Currency;
   onShowToast?: (message: string, type?: 'success' | 'error') => void;
   currentUserEmail?: string;
   onDelete?: (productId: string) => void;
   showDeleteButton?: boolean; 
+  onShare: (product: Product) => void;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
@@ -19,13 +19,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onClick, 
   isWishlisted = false, 
   onToggleWishlist,
-  currency,
-  onShowToast,
   currentUserEmail,
   onDelete,
   showDeleteButton = false, 
+  onShare
 }) => {
-  const convertedPrice = Math.round(product.price * currency.rate);
   const isOwner = currentUserEmail && product.sellerEmail && currentUserEmail === product.sellerEmail;
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -38,34 +36,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const handleWhatsAppClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     let digits = product.phoneNumber.replace(/\D/g, '');
-    if (digits.startsWith('0')) digits = '20' + digits.substring(1);
     const message = encodeURIComponent(`Hi, I'm interested in: ${product.title}`);
     window.open(`https://wa.me/${digits}?text=${message}`, '_blank');
   };
 
-  const handleShareClick = async (e: React.MouseEvent) => {
+  const handleShareClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const shareUrl = "https://bazaar-gules-three.vercel.app";
-    const shareData = {
-      title: `Bazaar: ${product.title}`,
-      text: `🔥 Check out this ${product.title} on Bazaar Marketplace!\n💰 Price: ${currency.symbol}${convertedPrice.toLocaleString()}`,
-      url: shareUrl
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') console.error("Share failed");
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        onShowToast?.("Ad link copied!", "success");
-      } catch (err) {
-        onShowToast?.("Copy failed.", "error");
-      }
-    }
+    onShare(product);
   };
 
   return (
@@ -81,7 +58,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
           loading="lazy"
         />
         
-        {/* Wishlist Button - Moved closer to edge, smaller */}
         <button
           onClick={onToggleWishlist}
           className={`absolute top-3 left-3 p-2 rounded-xl backdrop-blur-md transition-all z-10 border shadow-lg ${
@@ -93,7 +69,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </svg>
         </button>
 
-        {/* Delete Button - Moved closer to edge, smaller */}
         {showDeleteButton && isOwner && (
           <button
             onClick={handleDelete}
@@ -106,33 +81,37 @@ const ProductCard: React.FC<ProductCardProps> = ({
         )}
       </div>
 
-      <div className="p-5 flex flex-col flex-grow">
-        {/* Category badge moved here from top of image */}
-        <div className="mb-3">
+      <div className="p-4 flex flex-col flex-grow">
+        <div className="mb-2">
           <span className="inline-block px-2.5 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-lg text-[7px] font-black uppercase tracking-[0.2em]">
             {product.category}
           </span>
         </div>
 
         <div className="mb-4">
-          <h3 className="text-[12px] font-black text-white uppercase tracking-tight line-clamp-1 mb-1">
+          <h3 className="text-[11px] font-black text-white uppercase tracking-tight line-clamp-1 mb-1">
             {product.title}
           </h3>
-          <span className="text-xl font-black text-indigo-400">
-            {currency.symbol}{convertedPrice.toLocaleString()}
-          </span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-black text-indigo-400 leading-none">
+              {product.price.toLocaleString()}
+            </span>
+            <span className="text-[9px] uppercase font-black text-indigo-400/60 tracking-wider">
+              {product.currency}
+            </span>
+          </div>
         </div>
 
-        <div className="mt-auto flex flex-col gap-2.5">
+        <div className="mt-auto flex flex-col gap-2">
           <button 
             onClick={handleShareClick}
-            className="w-full py-3.5 bg-indigo-600/10 hover:bg-indigo-600/30 text-indigo-400 rounded-2xl text-[9px] font-black flex items-center justify-center gap-2 transition-all border border-indigo-500/30 uppercase tracking-[0.2em]"
+            className="w-full py-3 bg-[#14152b] hover:bg-[#1a1c3d] text-indigo-300/60 rounded-2xl text-[8px] font-black border border-white/5 uppercase tracking-[0.2em] transition-all active:scale-95"
           >
             SHARE AD
           </button>
           <button 
             onClick={handleWhatsAppClick}
-            className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[9px] font-black flex items-center justify-center gap-2 transition-all shadow-xl active:scale-95 border border-white/10 uppercase tracking-[0.2em]"
+            className="w-full py-3 bg-[#0f9d58] hover:bg-[#0da85d] text-white rounded-2xl text-[8px] font-black uppercase tracking-[0.2em] transition-all shadow-lg active:scale-95"
           >
             WHATSAPP
           </button>

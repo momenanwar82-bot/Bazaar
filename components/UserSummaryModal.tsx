@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Product, Currency, SellerNotification } from '../types';
+import { Product, SellerNotification } from '../types';
 import { getSellerStats } from '../services/geminiService';
 import ProductCard from './ProductCard';
 import AdBanner from './AdBanner';
@@ -13,7 +13,6 @@ interface UserSummaryModalProps {
   onClose: () => void;
   onLogout: () => void;
   onProductClick: (product: Product) => void;
-  currency: Currency;
   onDeleteProduct: (productId: string) => void;
   onClearNotification: (id: string) => void;
   onRefresh: () => Promise<void>;
@@ -29,7 +28,6 @@ const UserSummaryModal: React.FC<UserSummaryModalProps> = ({
   onClose, 
   onLogout, 
   onProductClick,
-  currency,
   onDeleteProduct,
   initialTab = 'listings',
   currentUserEmail
@@ -37,7 +35,6 @@ const UserSummaryModal: React.FC<UserSummaryModalProps> = ({
   const [activeTab, setActiveTab] = useState<'listings' | 'saved' | 'alerts'>(initialTab);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [stats, setStats] = useState<{ rating: number; reviewsCount: number } | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -64,7 +61,6 @@ const UserSummaryModal: React.FC<UserSummaryModalProps> = ({
           <ProductCard 
             product={p} 
             onClick={() => onProductClick(p)} 
-            currency={currency}
             currentUserEmail={currentUserEmail}
             onDelete={handleDeleteWithAnimation}
             showDeleteButton={isOwnerMode} 
@@ -76,25 +72,25 @@ const UserSummaryModal: React.FC<UserSummaryModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-950/95 backdrop-blur-2xl">
-      <div 
-        ref={scrollContainerRef}
-        className="bg-slate-900/40 backdrop-blur-3xl w-full max-w-2xl sm:rounded-[50px] shadow-2xl border border-white/10 overflow-y-auto overflow-x-hidden h-full sm:max-h-[92vh] flex flex-col relative custom-scrollbar scroll-smooth"
-      >
-        {/* Compact Header */}
+      <div className="bg-slate-900/40 backdrop-blur-3xl w-full max-w-2xl sm:rounded-[50px] shadow-2xl border border-white/10 overflow-y-auto overflow-x-hidden h-full sm:max-h-[92vh] flex flex-col relative custom-scrollbar">
         <div className="relative p-6 sm:p-10 bg-gradient-to-br from-indigo-900/40 to-slate-950/40 border-b border-white/5 shrink-0">
-          <div className="flex justify-between items-start mb-8">
-             <button onClick={onLogout} className="p-3 bg-red-600/10 rounded-2xl text-red-500 border border-red-500/20 active:scale-90 transition-all">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex justify-between items-center mb-8">
+             <button 
+               onClick={onLogout} 
+               className="group flex items-center gap-2.5 px-5 py-2.5 bg-rose-500/10 hover:bg-rose-600 text-rose-500 hover:text-white rounded-2xl border border-rose-500/20 transition-all active:scale-95 shadow-lg shadow-rose-950/20"
+             >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
+                <span className="text-[9px] font-black uppercase tracking-[0.2em]">Logout</span>
              </button>
-             <button onClick={onClose} className="p-3 bg-white/5 rounded-full text-white border border-white/10 active:scale-90 transition-all">
+             <button onClick={onClose} className="p-3 bg-white/5 hover:bg-white/10 rounded-full text-white border border-white/10 active:scale-90 transition-all">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
              </button>
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-indigo-600 rounded-[30px] flex items-center justify-center text-white text-3xl sm:text-4xl font-black uppercase shadow-2xl border border-white/10">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-indigo-600 rounded-[30px] flex items-center justify-center text-white text-3xl sm:text-4xl font-black border border-white/10">
               {user.name.charAt(0)}
             </div>
             <div className="flex-1 text-left">
@@ -114,39 +110,16 @@ const UserSummaryModal: React.FC<UserSummaryModalProps> = ({
           </div>
         </div>
 
-        {/* Floating Tab Bar */}
         <div className="sticky top-0 z-[110] px-6 py-4 bg-slate-900/80 backdrop-blur-xl border-b border-white/5 flex gap-3">
-            <button 
-              onClick={() => setActiveTab('listings')} 
-              className={`flex-1 py-3.5 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${
-                activeTab === 'listings' ? 'bg-indigo-600 text-white border-indigo-400 shadow-lg shadow-indigo-900/40' : 'bg-slate-800/40 text-slate-500 border-white/5'
-              }`}
-            >
-              MY ADS ({userProducts.length})
-            </button>
-            <button 
-              onClick={() => setActiveTab('saved')} 
-              className={`flex-1 py-3.5 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${
-                activeTab === 'saved' ? 'bg-indigo-600 text-white border-indigo-400 shadow-lg shadow-indigo-900/40' : 'bg-slate-800/40 text-slate-500 border-white/5'
-              }`}
-            >
-              SAVED ({wishlistedProducts.length})
-            </button>
+            <button onClick={() => setActiveTab('listings')} className={`flex-1 py-3.5 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${activeTab === 'listings' ? 'bg-indigo-600 text-white border-indigo-400 shadow-lg' : 'bg-slate-800/40 text-slate-500 border-white/5'}`}>MY ADS</button>
+            <button onClick={() => setActiveTab('saved')} className={`flex-1 py-3.5 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${activeTab === 'saved' ? 'bg-indigo-600 text-white border-indigo-400 shadow-lg' : 'bg-slate-800/40 text-slate-500 border-white/5'}`}>SAVED</button>
         </div>
 
-        <div className="p-4 sm:p-8 space-y-6">
-            <AdBanner className="!h-[120px] !rounded-[35px]" />
-
+        <div className="p-4 sm:p-8">
+            <AdBanner className="mb-6 !h-[120px] !rounded-[35px]" />
             <div className="mt-4">
-              {activeTab === 'listings' ? (
-                  userProducts.length > 0 ? renderProductGrid(userProducts, true) : (
-                      <div className="py-24 text-center opacity-30 text-[9px] font-black uppercase tracking-[0.4em]">No active listings</div>
-                  )
-              ) : (
-                  wishlistedProducts.length > 0 ? renderProductGrid(wishlistedProducts, false) : (
-                      <div className="py-24 text-center opacity-30 text-[9px] font-black uppercase tracking-[0.4em]">Collection is empty</div>
-                  )
-              )}
+              {activeTab === 'listings' ? (userProducts.length > 0 ? renderProductGrid(userProducts, true) : <div className="py-24 text-center opacity-30 text-[9px] font-black uppercase tracking-[0.4em]">No listings</div>) 
+              : (wishlistedProducts.length > 0 ? renderProductGrid(wishlistedProducts, false) : <div className="py-24 text-center opacity-30 text-[9px] font-black uppercase tracking-[0.4em]">Empty</div>)}
             </div>
         </div>
       </div>
