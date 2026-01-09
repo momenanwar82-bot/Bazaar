@@ -272,6 +272,8 @@ const App: React.FC = () => {
           onClose={() => setViewingSellerName(null)}
           onProductClick={(p) => setSelectedProduct(p)}
           onStartChat={() => {}} 
+          currentUserName={user.name}
+          onShowToast={showToast}
         />
       )}
 

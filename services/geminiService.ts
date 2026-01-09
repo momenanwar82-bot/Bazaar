@@ -101,7 +101,7 @@ export const identifyProductFromImage = async (base64Image: string): Promise<any
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: [{ parts: [
-        { text: "Identity this product from the photo. Provide a catchy title and a high-converting professional marketing description. Return ONLY JSON: { 'title': 'Name', 'category': 'Cars|Phones|Clothing|Jewelry|Watches|Accessories|Real Estate|Games|Electronics|Furniture|Others', 'description': 'Full marketing pitch' }. Note: Jewelry includes Gold, Diamonds, Rings. Watches covers luxury and smart watches." }, 
+        { text: "Identity this product from the photo. Provide a catchy title and a high-converting professional marketing description. Return ONLY JSON: { 'title': 'Name', 'category': 'Cars|Phones|Laptops & PCs|Home Appliances|Electronics|Real Estate|Furniture|Clothing|Jewelry|Watches|Sports & Fitness|Games|Tools & DIY|Beauty|Others', 'description': 'Full marketing pitch' }. Note: Jewelry includes Gold, Diamonds, Rings. Watches covers luxury and smart watches. Home Appliances includes washing machines, fridges, etc. Tools & DIY includes power tools and hardware." }, 
         { inlineData: { mimeType: "image/jpeg", data } }
       ] }],
       config: { responseMimeType: "application/json" }
@@ -145,13 +145,35 @@ export const getUserUploadCountToday = async (email: string): Promise<number> =>
 
 export const getSellerStats = async (sellerName: string): Promise<any> => {
   try {
-    const q = query(collection(db, "product_comments"), where("sellerName", "==", sellerName));
-    const snapshot = await getDocs(q);
-    const ratings = snapshot.docs.map(d => d.data().rating as number);
-    const count = ratings.length;
-    const avg = count > 0 ? (ratings.reduce((a, b) => a + b, 0) / count) : 0;
+    // Fetch product reviews
+    const productReviewsQ = query(collection(db, "product_comments"), where("sellerName", "==", sellerName));
+    const productSnap = await getDocs(productReviewsQ);
+    
+    // Fetch direct seller profile ratings
+    const sellerRatingsQ = query(collection(db, "seller_ratings"), where("sellerName", "==", sellerName));
+    const sellerSnap = await getDocs(sellerRatingsQ);
+
+    const productRatings = productSnap.docs.map(d => d.data().rating as number);
+    const directRatings = sellerSnap.docs.map(d => d.data().rating as number);
+    
+    const allRatings = [...productRatings, ...directRatings];
+    const count = allRatings.length;
+    const avg = count > 0 ? (allRatings.reduce((a, b) => a + b, 0) / count) : 0;
+    
     return { rating: Number(avg.toFixed(1)), reviewsCount: count, joinedDate: "Feb 2024" };
   } catch (e) { return { rating: 0, reviewsCount: 0, joinedDate: "Feb 2024" }; }
+};
+
+export const addSellerRating = async (sellerName: string, rating: number, raterName: string): Promise<boolean> => {
+  try {
+    await addDoc(collection(db, "seller_ratings"), {
+      sellerName,
+      rating,
+      raterName,
+      timestamp: serverTimestamp()
+    });
+    return true;
+  } catch (e) { return false; }
 };
 
 export const getProductReviews = async (productId: string): Promise<any[]> => {
@@ -164,11 +186,57 @@ export const getProductReviews = async (productId: string): Promise<any[]> => {
 
 export const addProductReview = async (productId: string, rating: number, userName: string, comment: string): Promise<boolean> => {
   try {
-    const productDoc = await getDoc(doc(db, "products", productId));
-    const sellerName = productDoc.exists() ? (productDoc.data()?.sellerName || 'Unknown') : 'Unknown';
-    await addDoc(collection(db, "product_comments"), { productId, sellerName, rating, userName, comment, timestamp: serverTimestamp() });
+    const productRef = doc(db, "products", productId);
+    const productSnap = await getDoc(productRef);
+    
+    if (!productSnap.exists()) return false;
+    const productData = productSnap.data();
+    const sellerEmail = productData.sellerEmail;
+    const productTitle = productData.title;
+
+    // 1. Add the review
+    await addDoc(collection(db, "product_comments"), { 
+      productId, 
+      sellerName: productData.sellerName, 
+      rating, 
+      userName, 
+      comment, 
+      timestamp: serverTimestamp() 
+    });
+
+    // 2. Recalculate Average for the product specifically
+    const q = query(collection(db, "product_comments"), where("productId", "==", productId));
+    const snapshot = await getDocs(q);
+    const ratings = snapshot.docs.map(d => d.data().rating as number);
+    const newCount = ratings.length;
+    const newAvg = ratings.reduce((a, b) => a + b, 0) / newCount;
+
+    // 3. Strict Quality Check: If rating < 2, purge the product
+    if (newAvg < 2 && newCount >= 1) {
+      await deleteDoc(productRef);
+      // Notify seller
+      await addDoc(collection(db, "notifications"), {
+        sellerEmail,
+        productTitle,
+        type: 'quality_removal',
+        message: `Your ad "${productTitle}" was removed due to low ratings (below 2.0 stars).`,
+        timestamp: serverTimestamp(),
+        isRead: false
+      });
+      return true; 
+    }
+
+    // 4. Update product stats normally
+    await updateDoc(productRef, {
+      rating: Number(newAvg.toFixed(1)),
+      reviewsCount: newCount
+    });
+
     return true;
-  } catch (e) { return false; }
+  } catch (e) { 
+    console.error("Error adding review:", e);
+    return false; 
+  }
 };
 
 export const getLiveChatResponse = async (productTitle: string, userMessage: string, history: any[]): Promise<string> => {

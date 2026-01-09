@@ -72,7 +72,7 @@ const UserSummaryModal: React.FC<UserSummaryModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-950/95 backdrop-blur-2xl">
-      <div className="bg-slate-900/40 backdrop-blur-3xl w-full max-w-2xl sm:rounded-[50px] shadow-2xl border border-white/10 overflow-y-auto overflow-x-hidden h-full sm:max-h-[92vh] flex flex-col relative custom-scrollbar">
+      <div className="bg-slate-900/40 backdrop-blur-3xl w-full max-w-2xl sm:rounded-[50px] shadow-2xl border border-white/10 overflow-y-auto overflow-x-hidden h-full sm:max-h-[92vh] flex flex-col relative custom-scrollbar text-left">
         <div className="relative p-6 sm:p-10 bg-gradient-to-br from-indigo-900/40 to-slate-950/40 border-b border-white/5 shrink-0">
           <div className="flex justify-between items-center mb-8">
              <button 
@@ -90,20 +90,34 @@ const UserSummaryModal: React.FC<UserSummaryModalProps> = ({
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-indigo-600 rounded-[30px] flex items-center justify-center text-white text-3xl sm:text-4xl font-black border border-white/10">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-indigo-600 rounded-[30px] flex items-center justify-center text-white text-3xl sm:text-4xl font-black border border-white/10 shadow-xl">
               {user.name.charAt(0)}
             </div>
             <div className="flex-1 text-left">
-              <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter mb-1">{user.name}</h2>
-              <div className="flex gap-4 items-center">
-                <div className="flex flex-col">
-                  <span className="text-indigo-400 font-black text-sm">{stats?.rating || '0.0'}</span>
-                  <span className="text-[7px] text-slate-500 uppercase tracking-widest font-black">Rating</span>
+              <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter mb-2">{user.name}</h2>
+              <div className="flex flex-col gap-4">
+                <div className="flex gap-4 items-center">
+                  <div className="flex flex-col">
+                    <span className="text-amber-400 font-black text-sm">★ {stats?.rating || '0.0'}</span>
+                    <span className="text-[7px] text-slate-500 uppercase tracking-widest font-black">Rating</span>
+                  </div>
+                  <div className="w-px h-6 bg-white/10"></div>
+                  <div className="flex flex-col">
+                    <span className="text-white font-black text-sm">{userProducts.length}</span>
+                    <span className="text-[7px] text-slate-500 uppercase tracking-widest font-black">Ads</span>
+                  </div>
                 </div>
-                <div className="w-px h-6 bg-white/10"></div>
-                <div className="flex flex-col">
-                  <span className="text-white font-black text-sm">{userProducts.length}</span>
-                  <span className="text-[7px] text-slate-500 uppercase tracking-widest font-black">Ads</span>
+
+                {/* Reputation Example for Owner */}
+                <div className="bg-white/5 p-3 rounded-xl border border-white/5 inline-block">
+                  <p className="text-[7px] font-black text-slate-600 uppercase tracking-[0.3em] mb-2">Merchant Reputation UI (Read-Only)</p>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <svg key={s} className={`w-4 h-4 ${s <= Math.round(stats?.rating || 0) ? 'text-amber-400 fill-current' : 'text-slate-800'}`} viewBox="0 0 24 24">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                      </svg>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

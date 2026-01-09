@@ -5,14 +5,18 @@ export const CATEGORIES: Category[] = [
   'All',
   'Cars',
   'Phones',
+  'Laptops & PCs',
+  'Home Appliances',
+  'Electronics',
+  'Real Estate',
+  'Furniture',
   'Clothing',
   'Jewelry',
   'Watches',
-  'Accessories',
-  'Real Estate',
+  'Sports & Fitness',
   'Games',
-  'Electronics',
-  'Furniture',
+  'Tools & DIY',
+  'Beauty',
   'Others'
 ];
 

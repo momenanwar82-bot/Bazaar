@@ -1,5 +1,5 @@
 
-export type Category = 'All' | 'Cars' | 'Phones' | 'Clothing' | 'Jewelry' | 'Watches' | 'Accessories' | 'Real Estate' | 'Games' | 'Electronics' | 'Furniture' | 'Others';
+export type Category = 'All' | 'Cars' | 'Phones' | 'Laptops & PCs' | 'Home Appliances' | 'Electronics' | 'Real Estate' | 'Furniture' | 'Clothing' | 'Jewelry' | 'Watches' | 'Sports & Fitness' | 'Games' | 'Tools & DIY' | 'Beauty' | 'Others';
 
 export interface Review {
   id: string;
