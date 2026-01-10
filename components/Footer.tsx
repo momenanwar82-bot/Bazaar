@@ -68,11 +68,11 @@ const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenTerms, onOpenConta
 
         <div className="mt-16 sm:mt-24 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
           <p className="text-[10px] text-slate-600 font-black uppercase tracking-[0.25em]">
-            © 2026 BAZAAR GLOBAL. ALL RIGHTS RESERVED.
+            BAZAAR PRO MARKET © 2026 - ALL RIGHTS RESERVED.
           </p>
           <div className="flex gap-6">
             <span className="text-[10px] text-slate-700 font-bold uppercase tracking-widest">Designed for Excellence</span>
-            <span className="text-[10px] text-indigo-900 font-bold uppercase tracking-widest">Powered by Gemini AI</span>
+            <span className="text-[10px] text-indigo-900/60 font-bold uppercase tracking-widest">Advanced Neural Processing</span>
           </div>
         </div>
       </div>
