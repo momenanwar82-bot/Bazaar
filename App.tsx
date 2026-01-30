@@ -13,15 +13,20 @@ import AdBanner from './components/AdBanner';
 import ShareSheet from './components/ShareSheet';
 import ChatManager from './components/ChatManager'; // استيراد نظام الدردشة الجديد
 import { PrivacyModal, TermsModal, ContactModal } from './components/LegalModals';
+
+// --- التعديل هنا: استيراد db و auth من ملف الكونفيج الجديد ---
+import { db, auth } from './services/config';
+
+// استيراد باقي الوظائف من geminiService
 import { 
-  db, 
-  auth,
   saveProductToDB, 
   deleteProductFromDB, 
   markNotificationAsRead,
   logoutUser,
   getUserUploadCountToday
 } from './services/geminiService';
+// ---------------------------------------------------------
+
 import { 
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -207,7 +212,7 @@ const App: React.FC = () => {
         onMarkAsRead={markNotificationAsRead} onClearAll={() => {}}
         onViewMyProfile={() => { setSummaryInitialTab('listings'); setIsSummaryModalOpen(true); }}
         remainingAds={remainingAds}
-        onOpenChat={() => setShowChat(true)} // فتح الشات من النافبار
+        onOpenChat={() => setShowChat(true)}
       />
       
       {!showChat && <CategoryBar selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />}
