@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, auth } from '../firebase/config';
+// التعديل الجوهري هنا: غيرنا firebase لـ services
+import { db, auth } from '../services/config'; 
 import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth'; // مهمة جداً
 
