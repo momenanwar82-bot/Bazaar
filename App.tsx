@@ -11,13 +11,14 @@ import UserProfileModal from './components/UserProfileModal';
 import Footer from './components/Footer';
 import AdBanner from './components/AdBanner';
 import ShareSheet from './components/ShareSheet';
-import ChatManager from './components/ChatManager'; // استيراد نظام الدردشة الجديد
+import ChatManager from './components/ChatManager'; 
 import { PrivacyModal, TermsModal, ContactModal } from './components/LegalModals';
 
-// --- التعديل هنا: استيراد db و auth من ملف الكونفيج الجديد ---
+// --- الاستيراد الصحيح من المكتبات المثبتة ---
 import { db, auth } from './services/config';
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
 
-// استيراد باقي الوظائف من geminiService
 import { 
   saveProductToDB, 
   deleteProductFromDB, 
@@ -25,18 +26,6 @@ import {
   logoutUser,
   getUserUploadCountToday
 } from './services/geminiService';
-// ---------------------------------------------------------
-
-import { 
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
-  orderBy,
-  where
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -57,7 +46,6 @@ const App: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [remainingAds, setRemainingAds] = useState(0);
 
-  // حالة التحكم في صفحة الدردشة
   const [showChat, setShowChat] = useState(false);
   const [activeChatSeller, setActiveChatSeller] = useState<string | null>(null);
 
@@ -70,6 +58,7 @@ const App: React.FC = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // 1. مراقبة حالة تسجيل الدخول
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
@@ -78,11 +67,16 @@ const App: React.FC = () => {
         setUser(null);
       }
       setIsInitialLoad(false);
+    }, (error) => {
+      console.error("Auth Error:", error);
+      setIsInitialLoad(false); // ضمان عدم تعليق الموقع
     });
     return () => unsubscribe();
   }, []);
 
+  // 2. جلب المنتجات
   useEffect(() => {
+    if (!db) return;
     const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedProducts = snapshot.docs.map(doc => {
@@ -93,36 +87,25 @@ const App: React.FC = () => {
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date()
         } as Product;
       });
-      
-      if (fetchedProducts.length === 0) {
-        setProducts([]);
-        setDbEmpty(true);
-      } else {
-        setProducts(fetchedProducts);
-        setDbEmpty(false);
-      }
+      setProducts(fetchedProducts);
+      setDbEmpty(fetchedProducts.length === 0);
+    }, (error) => {
+      console.error("Firestore Error:", error);
     });
     return () => unsubscribe();
   }, []);
 
-  const displayProducts = useMemo(() => {
-    if (products.length === 0 && dbEmpty) return []; 
-    return products;
-  }, [products, dbEmpty]);
-
+  // 3. التنبيهات وإدارة الإعلانات
   useEffect(() => {
-    if (!user) return;
+    if (!user || !db) return;
     updateRemainingAds();
     const q = query(collection(db, "notifications"), where("sellerEmail", "==", user.email));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date()
-        };
-      }) as SellerNotification[];
+      const fetched = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate() : new Date()
+      })) as SellerNotification[];
       setNotifications(fetched.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()));
     });
     return () => unsubscribe();
@@ -140,24 +123,6 @@ const App: React.FC = () => {
     setShowChat(false);
     setIsSummaryModalOpen(false);
     showToast("Successfully logged out");
-  };
-
-  const handleAddProduct = async (newProduct: Product) => {
-    if (!user) return;
-    try {
-      await saveProductToDB({
-        ...newProduct,
-        sellerName: user.name,
-        sellerEmail: user.email,
-        rating: 0,
-        reviewsCount: 0
-      });
-      await updateRemainingAds();
-      showToast("Listing published successfully!");
-      setIsSellModalOpen(false);
-    } catch (err) {
-      showToast("Failed to publish ad", "error");
-    }
   };
 
   const handleDeleteProduct = async (productId: string) => {
@@ -179,13 +144,13 @@ const App: React.FC = () => {
   };
 
   const filteredProducts = useMemo(() => {
-    return displayProducts.filter(p => {
+    return products.filter(p => {
       const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
       const matchesSearch = searchQuery === '' || p.title.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesFav = !showFavoritesOnly || wishlist.includes(p.id);
       return matchesCategory && matchesSearch && matchesFav;
     });
-  }, [displayProducts, selectedCategory, searchQuery, showFavoritesOnly, wishlist]);
+  }, [products, selectedCategory, searchQuery, showFavoritesOnly, wishlist]);
 
   if (isInitialLoad) return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -219,11 +184,7 @@ const App: React.FC = () => {
 
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full relative text-left">
         {showChat ? (
-          <ChatManager 
-            currentUserEmail={user.email} 
-            initialSellerEmail={activeChatSeller} 
-            onClose={() => {setShowChat(false); setActiveChatSeller(null);}} 
-          />
+          <ChatManager onClose={() => {setShowChat(false); setActiveChatSeller(null);}} />
         ) : (
           <>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase mb-6 tracking-tight flex items-center gap-3">
@@ -248,28 +209,23 @@ const App: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <div className="py-32 text-center">
-                 <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-6 opacity-20">
-                    <svg className="w-12 h-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                 </div>
+              <div className="py-32 text-center opacity-20">
                  <p className="text-slate-500 font-black text-[10px] uppercase tracking-[0.4em]">No listings found</p>
               </div>
             )}
           </>
         )}
-
-        {toast && (
-          <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] px-8 py-4 rounded-2xl shadow-2xl border backdrop-blur-xl animate-in slide-in-from-bottom-5 duration-500 font-black text-[10px] uppercase tracking-widest ${
-            toast.type === 'success' ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30' : 'bg-red-600/20 text-red-400 border-red-500/30'
-          }`}>
-            {toast.message}
-          </div>
-        )}
       </main>
 
-      <Footer onOpenPrivacy={() => setShowPrivacy(false)} onOpenTerms={() => setShowTerms(true)} onOpenContact={() => setShowContact(false)} onOpenSell={() => setIsSellModalOpen(true)} />
+      {/* تصحيح منطق فتح النوافذ المنبثقة */}
+      <Footer 
+        onOpenPrivacy={() => setShowPrivacy(true)} 
+        onOpenTerms={() => setShowTerms(true)} 
+        onOpenContact={() => setShowContact(true)} 
+        onOpenSell={() => setIsSellModalOpen(true)} 
+      />
 
-      {isSellModalOpen && <SellProductModal onClose={() => setIsSellModalOpen(false)} onAdd={handleAddProduct} userEmail={user.email} />}
+      {isSellModalOpen && <SellProductModal onClose={() => setIsSellModalOpen(false)} onAdd={async (p) => { await saveProductToDB({...p, sellerName: user.name, sellerEmail: user.email}); setIsSellModalOpen(false); updateRemainingAds(); }} userEmail={user.email} />}
       
       {selectedProduct && <ProductDetailModal 
         product={selectedProduct} onClose={() => setSelectedProduct(null)} 
@@ -280,23 +236,13 @@ const App: React.FC = () => {
         onStartChat={() => { setActiveChatSeller(selectedProduct.sellerEmail); setShowChat(true); setSelectedProduct(null); }}
       />}
 
-      {sharingProduct && (
-        <ShareSheet 
-          product={sharingProduct} 
-          onClose={() => setSharingProduct(null)} 
-          onShowToast={showToast} 
-        />
-      )}
+      {sharingProduct && <ShareSheet product={sharingProduct} onClose={() => setSharingProduct(null)} onShowToast={showToast} />}
 
       {viewingSellerName && (
         <UserProfileModal 
-          sellerName={viewingSellerName} 
-          allProducts={products} 
-          onClose={() => setViewingSellerName(null)}
-          onProductClick={(p) => setSelectedProduct(p)}
-          onStartChat={(email) => { setActiveChatSeller(email); setShowChat(true); setViewingSellerName(null); }} 
-          currentUserName={user.name}
-          onShowToast={showToast}
+          sellerName={viewingSellerName} allProducts={products} onClose={() => setViewingSellerName(null)}
+          onProductClick={(p) => setSelectedProduct(p)} onStartChat={(email) => { setActiveChatSeller(email); setShowChat(true); setViewingSellerName(null); }} 
+          currentUserName={user.name} onShowToast={showToast}
         />
       )}
 
@@ -315,6 +261,14 @@ const App: React.FC = () => {
       {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
       {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
       {showContact && <ContactModal onClose={() => setShowContact(false)} />}
+      
+      {toast && (
+        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] px-8 py-4 rounded-2xl border backdrop-blur-xl font-black text-[10px] uppercase tracking-widest ${
+          toast.type === 'success' ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30' : 'bg-red-600/20 text-red-400 border-red-500/30'
+        }`}>
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 };
