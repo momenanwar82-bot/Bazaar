@@ -1,92 +1,105 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, auth } from '../services/config'; 
-import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import { db, auth } from '../services/config';
+import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 
-const ChatManager: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [inputText, setInputText] = useState('');
-  const [messages, setMessages] = useState<any[]>([]);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [authChecked, setAuthChecked] = useState(false); // تعديل جوهري لعدم تعليق الموقع
+interface Message {
+  id: string;
+  text: string;
+  senderId: string;
+  senderName: string;
+  timestamp: any;
+}
+
+interface ChatManagerProps {
+  adId: string; // معرف الإعلان عشان الشات يبقى خاص بكل منتج
+  onClose: () => void;
+}
+
+const ChatManager: React.FC<ChatManagerProps> = ({ adId, onClose }) => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const user = auth.currentUser;
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // 1. جلب الرسائل بتصفية من المنبع (Firestore)
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user || null);
-      setAuthChecked(true); // تأكيد فحص الحالة
+    if (!user || !adId) return;
+
+    // مسار احترافي: كل إعلان له "غرفة" رسايل خاصة بيه
+    const q = query(
+      collection(db, "ads", adId, "messages"), 
+      orderBy("timestamp", "asc"),
+      limit(50) // أمان عشان الموقع ميهنجش
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const msgs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Message[];
+      setMessages(msgs);
+    }, (error) => {
+      console.error("Chat Error:", error);
     });
-    return () => unsubscribeAuth();
-  }, []);
 
+    return () => unsubscribe(); // تنظيف الذاكرة ومنع الشاشة السوداء
+  }, [adId, user]);
+
+  // 2. سكرول ذكي وسلس
   useEffect(() => {
-    if (!currentUser || !db) return;
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
 
-    try {
-      const q = query(collection(db, "messages"), orderBy("timestamp", "asc"));
-      const unsubscribeChat = onSnapshot(q, (snapshot) => {
-        const fetchedMessages = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setMessages(fetchedMessages);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-      }, (error) => {
-        console.error("Firebase Error:", error);
-      });
-      return () => unsubscribeChat();
-    } catch (e) {
-      console.error("Chat Setup Error:", e);
-    }
-  }, [currentUser]);
-
-  const handleSend = async (e: React.FormEvent) => {
+  const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || !currentUser) return;
+    if (!newMessage.trim() || !user || !adId) return;
 
     try {
-      await addDoc(collection(db, "messages"), {
-        text: inputText.trim(),
-        senderId: currentUser.uid,
-        senderEmail: currentUser.email,
-        senderName: currentUser.displayName || 'مستخدم',
-        timestamp: serverTimestamp(),
+      await addDoc(collection(db, "ads", adId, "messages"), {
+        text: newMessage,
+        senderId: user.uid,
+        senderName: user.displayName || 'مستخدم',
+        timestamp: serverTimestamp()
       });
-      setInputText('');
+      setNewMessage('');
     } catch (err) {
-      alert("فشل الإرسال. راجع إعدادات Firebase");
+      console.error("Send Error:", err);
     }
   };
 
-  // لو لسه بيحمل، بنرجع null بدل ما نعلق الموقع كله
-  if (!authChecked) return null;
-
-  if (!currentUser) return (
-    <div className="fixed bottom-4 right-4 bg-white p-6 rounded-2xl shadow-xl border text-red-500 font-bold z-[110]">
-      ⚠️ سجل دخولك أولاً للدردشة
-      <button onClick={onClose} className="block mt-2 text-xs text-gray-500 underline">إغلاق</button>
-    </div>
-  );
-
   return (
-    <div className="fixed inset-0 sm:inset-auto sm:bottom-4 sm:right-4 z-[100] w-full sm:w-[400px] h-full sm:h-[600px] bg-white border flex flex-col shadow-2xl sm:rounded-2xl overflow-hidden text-black animate-in slide-in-from-bottom-5" dir="rtl">
-      <div className="p-4 bg-indigo-700 text-white flex justify-between items-center shrink-0 shadow-md">
-        <span className="font-bold">دردشة بازار رمضان</span>
-        <button onClick={onClose} className="hover:bg-indigo-800 p-1 rounded-full">✕</button>
+    <div className="flex flex-col h-[500px] bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+      {/* Header */}
+      <div className="p-4 bg-slate-800 flex justify-between items-center">
+        <h3 className="text-white font-bold">دردشة المنتج</h3>
+        <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f0f2f5]">
-        {messages.map((msg, i) => (
-          <div key={msg.id || i} className={`flex ${msg.senderId === currentUser?.uid ? 'justify-start' : 'justify-end'}`}>
-            <div className={`max-w-[85%] p-3 rounded-2xl text-[15px] shadow-sm ${msg.senderId === currentUser?.uid ? 'bg-indigo-600 text-white rounded-tl-none' : 'bg-white border text-slate-800 rounded-tr-none'}`}>
-              {msg.text}
-              <div className="text-[10px] mt-1 opacity-70 text-left">{msg.senderName}</div>
+
+      {/* Messages Area */}
+      <div className="flex-grow overflow-y-auto p-4 space-y-4">
+        {messages.map((msg) => (
+          <div key={msg.id} className={`flex ${msg.senderId === user?.uid ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[80%] p-3 rounded-2xl ${msg.senderId === user?.uid ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'}`}>
+              <p className="text-xs opacity-50 mb-1">{msg.senderName}</p>
+              <p>{msg.text}</p>
             </div>
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
-      <form onSubmit={handleSend} className="p-4 bg-white border-t flex gap-2">
-        <input className="flex-1 border rounded-full px-4 py-2 outline-none text-sm" placeholder="اكتب استفسارك..." value={inputText} onChange={(e) => setInputText(e.target.value)} />
-        <button type="submit" className="bg-indigo-600 text-white p-2 rounded-full shadow-md">إرسال</button>
+
+      {/* Input Area */}
+      <form onSubmit={sendMessage} className="p-4 bg-slate-800 flex gap-2">
+        <input
+          type="text"
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          placeholder="اكتب رسالتك..."
+          className="flex-grow bg-slate-900 text-white p-2 rounded-xl border border-slate-700 focus:outline-none focus:border-indigo-500"
+        />
+        <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-500 transition-colors">
+          ارسل
+        </button>
       </form>
     </div>
   );
