@@ -1,66 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Category, Product, SellerNotification } from './types';
-import Navbar from './components/Navbar';
-import CategoryBar from './components/CategoryBar';
-import ProductCard from './components/ProductCard';
-import SellProductModal from './components/SellProductModal';
-import ProductDetailModal from './components/ProductDetailModal';
-import LoginModal from './components/LoginModal';
-import UserSummaryModal from './components/UserSummaryModal';
-import UserProfileModal from './components/UserProfileModal'; 
-import Footer from './components/Footer';
-import AdBanner from './components/AdBanner';
-import ShareSheet from './components/ShareSheet';
-import ChatManager from './components/ChatManager'; 
-import { PrivacyModal, TermsModal, ContactModal } from './components/LegalModals';
-
-// --- الاستيراد الصحيح من المكتبات المثبتة ---
-import { db, auth } from './services/config';
-import { onAuthStateChanged } from "firebase/auth";
-import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
-
-import { 
-  saveProductToDB, 
-  deleteProductFromDB, 
-  markNotificationAsRead,
-  logoutUser,
-  getUserUploadCountToday
-} from './services/geminiService';
-
-const App: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [notifications, setNotifications] = useState<SellerNotification[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<Category>('All');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSellModalOpen, setIsSellModalOpen] = useState(false);
-  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
-  const [viewingSellerName, setViewingSellerName] = useState<string | null>(null); 
-  const [summaryInitialTab, setSummaryInitialTab] = useState<'listings' | 'saved' | 'alerts'>('listings');
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [sharingProduct, setSharingProduct] = useState<Product | null>(null);
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-  const [user, setUser] = useState<{ email: string; name: string } | null>(null);
-  const [wishlist, setWishlist] = useState<string[]>([]);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [dbEmpty, setDbEmpty] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [remainingAds, setRemainingAds] = useState(0);
-
-  const [showChat, setShowChat] = useState(false);
-  const [activeChatSeller, setActiveChatSeller] = useState<string | null>(null);
-
-  const [showPrivacy, setShowPrivacy] = useState(false);
-  const [showTerms, setShowTerms] = useState(false);
-  const [showContact, setShowContact] = useState(false);
-
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  // 1. مراقبة حالة تسجيل الدخول
+// 1. مراقبة حالة تسجيل الدخول (تعديل بسيط لضمان الفتح)
   useEffect(() => {
+    // مؤقت أمان: لو مفيش رد في خلال 3 ثواني، افتح الموقع برضه
+    const timer = setTimeout(() => {
+      setIsInitialLoad(false);
+    }, 3000);
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      clearTimeout(timer); // لو الرد جه بسرعة، الغي المؤقت
       if (firebaseUser) {
         setUser({ email: firebaseUser.email || '', name: firebaseUser.displayName || 'User' });
       } else {
@@ -69,47 +15,14 @@ const App: React.FC = () => {
       setIsInitialLoad(false);
     }, (error) => {
       console.error("Auth Error:", error);
-      setIsInitialLoad(false); // ضمان عدم تعليق الموقع
+      setIsInitialLoad(false);
     });
-    return () => unsubscribe();
+    
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
-
-  // 2. جلب المنتجات
-  useEffect(() => {
-    if (!db) return;
-    const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedProducts = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date()
-        } as Product;
-      });
-      setProducts(fetchedProducts);
-      setDbEmpty(fetchedProducts.length === 0);
-    }, (error) => {
-      console.error("Firestore Error:", error);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // 3. التنبيهات وإدارة الإعلانات
-  useEffect(() => {
-    if (!user || !db) return;
-    updateRemainingAds();
-    const q = query(collection(db, "notifications"), where("sellerEmail", "==", user.email));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate() : new Date()
-      })) as SellerNotification[];
-      setNotifications(fetched.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()));
-    });
-    return () => unsubscribe();
-  }, [user]);
 
   const updateRemainingAds = async () => {
     if (!user) return;
