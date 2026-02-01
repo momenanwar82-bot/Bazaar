@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, auth } from '../services/config';
+// ✅ عدّلنا المسار هنا
+import { db, auth } from '../services/firebase';
 import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 
 interface Message {
@@ -21,15 +22,14 @@ const ChatManager: React.FC<ChatManagerProps> = ({ adId, onClose }) => {
   const user = auth.currentUser;
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 1. جلب الرسائل بتصفية من المنبع (Firestore)
+  // جلب الرسائل لكل إعلان
   useEffect(() => {
     if (!user || !adId) return;
 
-    // مسار احترافي: كل إعلان له "غرفة" رسايل خاصة بيه
     const q = query(
-      collection(db, "ads", adId, "messages"), 
+      collection(db, "ads", adId, "messages"),
       orderBy("timestamp", "asc"),
-      limit(50) // أمان عشان الموقع ميهنجش
+      limit(50)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -42,10 +42,10 @@ const ChatManager: React.FC<ChatManagerProps> = ({ adId, onClose }) => {
       console.error("Chat Error:", error);
     });
 
-    return () => unsubscribe(); // تنظيف الذاكرة ومنع الشاشة السوداء
+    return () => unsubscribe();
   }, [adId, user]);
 
-  // 2. سكرول ذكي وسلس
+  // سكرول تلقائي
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
@@ -75,7 +75,7 @@ const ChatManager: React.FC<ChatManagerProps> = ({ adId, onClose }) => {
         <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
       </div>
 
-      {/* Messages Area */}
+      {/* Messages */}
       <div className="flex-grow overflow-y-auto p-4 space-y-4">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.senderId === user?.uid ? 'justify-end' : 'justify-start'}`}>
@@ -88,7 +88,7 @@ const ChatManager: React.FC<ChatManagerProps> = ({ adId, onClose }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
+      {/* Input */}
       <form onSubmit={sendMessage} className="p-4 bg-slate-800 flex gap-2">
         <input
           type="text"
