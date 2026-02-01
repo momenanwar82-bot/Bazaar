@@ -1,14 +1,19 @@
 import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
-import { db, auth } from './services/firebase';
+import { db, auth } from './services/firebase'; // firebase.ts منفصل
 import { onAuthStateChanged } from "firebase/auth";
 
 import Navbar from './components/Navbar';
 import CategoryBar from './components/CategoryBar';
 import ProductCard from './components/ProductCard';
-import Footer from './components/Footer';
+import SellProductModal from './components/SellProductModal';
+import ProductDetailModal from './components/ProductDetailModal';
 import LoginModal from './components/LoginModal';
+import UserSummaryModal from './components/UserSummaryModal';
+import Footer from './components/Footer';
+import ShareSheet from './components/ShareSheet';
+import { PrivacyModal, TermsModal, ContactModal } from './components/LegalModals';
 
-// 🔥 Lazy load للشات
+// Lazy load للشات
 const ChatManager = lazy(() => import('./components/ChatManager'));
 
 interface Product {
@@ -46,7 +51,7 @@ const App: React.FC = () => {
   // لو المستخدم غير مسجل دخول
   if (!user) return <LoginModal onClose={() => {}} onLogin={(e, n) => setUser({email: e, name: n})} hideCloseButton initialMode="login" />;
 
-  // التعامل مع فتح الشات لكل إعلان
+  // فتح الشات لكل إعلان
   const handleStartChat = (adId: string) => {
     setActiveChatAdId(adId);
     setShowChat(true);
@@ -69,7 +74,21 @@ const App: React.FC = () => {
                 />
               ))
             ) : (
-              <p className="text-slate-400">لا توجد منتجات حالياً</p>
+              <p className="text-slate-400 col-span-2 text-center">لا توجد منتجات حالياً</p>
             )}
           </div>
-        )
+        ) : (
+          <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center">جاري فتح المحادثة...</div>}>
+            <div className="fixed inset-0 z-50 p-4 flex items-center justify-center bg-black/80">
+              <ChatManager adId={activeChatAdId || 'demo'} onClose={() => setShowChat(false)} />
+            </div>
+          </Suspense>
+        )}
+      </main>
+
+      <Footer />
+    </div>
+  );
+};
+
+export default App;
