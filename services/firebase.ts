@@ -8,10 +8,10 @@ const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID // اللي هو 1:162360142442:web:615845038d886f1eb3f813
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// أهم سطر: لو Firebase شغال متعملوش initialize تاني
+// لو Firebase شغال مسبقاً، ما نعملش initialize تاني
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 export const db = getFirestore(app);
