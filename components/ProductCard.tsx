@@ -12,7 +12,7 @@ interface ProductCardProps {
   onDelete?: (productId: string) => void;
   showDeleteButton?: boolean; 
   onShare: (product: Product) => void;
-  onStartChat: () => void; // إضافة خاصية بدء الدردشة
+  onStartChat: () => void; // بدء الشات مباشر
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
@@ -26,11 +26,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onShare,
   onStartChat
 }) => {
-  const isOwner = currentUserEmail && product.sellerEmail && currentUserEmail === product.sellerEmail;
+  const isOwner = currentUserEmail && (product.sellerEmail ?? '') === currentUserEmail;
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onDelete && window.confirm("Are you sure you want to remove this ad?")) {
+    if (!onDelete) return;
+    if (window.confirm("Are you sure you want to remove this ad?")) {
       onDelete(product.id);
     }
   };
@@ -48,8 +49,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
   return (
     <div 
       onClick={onClick}
-      className="group bg-gradient-to-br from-[#0a0a0c] to-[#121218] rounded-[32px] overflow-hidden border border-white/5 shadow-2xl transition-all duration-500 cursor-pointer flex flex-col h-full active:scale-[0.98] relative text-left"
+      className="group bg-gradient-to-br from-[#0a0a0c] to-[#121218] rounded-[32px] overflow-hidden border border-white/5 shadow-2xl transition-transform duration-300 cursor-pointer flex flex-col h-full relative text-left hover:scale-[1.02]"
     >
+      {/* Image */}
       <div className="relative aspect-[4/5] overflow-hidden bg-slate-900 flex items-center justify-center">
         <img 
           src={product.imageUrl} 
@@ -60,19 +62,21 @@ const ProductCard: React.FC<ProductCardProps> = ({
         
         {/* Top Actions */}
         <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
+          {/* Rating */}
           {product.rating !== undefined && product.rating > 0 && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl">
               <Star size={10} className="text-amber-400 fill-current" />
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-black text-white leading-none">{product.rating}</span>
-                <span className="text-[8px] font-bold text-white/40 leading-none">({product.reviewsCount || 0})</span>
+                <span className="text-[8px] font-bold text-white/40 leading-none">({product.reviewsCount ?? 0})</span>
               </div>
             </div>
           )}
 
+          {/* Wishlist */}
           <button
-            onClick={onToggleWishlist}
-            className={`p-2.5 rounded-xl backdrop-blur-md transition-all border shadow-lg ${
+            onClick={(e) => { e.stopPropagation(); onToggleWishlist?.(e); }}
+            className={`p-2.5 rounded-xl backdrop-blur-md transition-all border shadow-lg focus:outline-none ${
               isWishlisted ? 'bg-rose-500 text-white border-rose-400' : 'bg-black/40 text-white/70 border-white/10 hover:bg-black/60'
             }`}
           >
@@ -80,42 +84,46 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </button>
         </div>
 
-        {/* Delete for Owner */}
+        {/* Delete Button */}
         {showDeleteButton && isOwner && (
           <button
             onClick={handleDelete}
-            className="absolute bottom-3 right-3 p-2.5 bg-rose-600/90 hover:bg-rose-500 text-white rounded-xl backdrop-blur-md transition-all z-10 border border-rose-400/30 shadow-lg"
+            className="absolute bottom-3 right-3 p-2.5 bg-rose-600/90 hover:bg-rose-500 text-white rounded-xl backdrop-blur-md transition-all z-10 border border-rose-400/30 shadow-lg focus:outline-none"
           >
             <Trash2 size={14} />
           </button>
         )}
       </div>
 
+      {/* Info */}
       <div className="p-5 flex flex-col flex-grow">
+        {/* Category */}
         <div className="mb-2">
           <span className="inline-block px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-lg text-[8px] font-black uppercase tracking-widest">
             {product.category}
           </span>
         </div>
 
+        {/* Title & Price */}
         <div className="mb-4">
           <h3 className="text-xs font-bold text-white uppercase tracking-tight line-clamp-1 mb-1 opacity-90">
             {product.title}
           </h3>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl font-black text-white leading-none">
-              {product.price.toLocaleString()}
+              {product.price?.toLocaleString() ?? '0'}
             </span>
             <span className="text-[10px] uppercase font-black text-indigo-500 tracking-widest">
-              {product.currency}
+              {product.currency ?? 'USD'}
             </span>
           </div>
         </div>
 
+        {/* Actions */}
         <div className="mt-auto flex flex-col gap-2">
           <button 
             onClick={handleShareClick}
-            className="w-full py-3.5 bg-white/5 hover:bg-white/10 text-white/70 rounded-2xl text-[9px] font-black border border-white/5 uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2"
+            className="w-full py-3.5 bg-white/5 hover:bg-white/10 text-white/70 rounded-2xl text-[9px] font-black border border-white/5 uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 focus:outline-none"
           >
             <Share2 size={12} />
             SHARE
@@ -124,7 +132,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {!isOwner && (
             <button 
               onClick={handleChatClick}
-              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 focus:outline-none"
             >
               <MessageSquare size={12} />
               LIVE CHAT
