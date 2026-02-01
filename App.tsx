@@ -1,26 +1,28 @@
 import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
-import { db, auth } from './services/firebase'; // firebase.ts منفصل
+import { db, auth } from './services/firebase';
 import { onAuthStateChanged } from "firebase/auth";
 
 import Navbar from './components/Navbar';
 import CategoryBar from './components/CategoryBar';
 import ProductCard from './components/ProductCard';
-import SellProductModal from './components/SellProductModal';
-import ProductDetailModal from './components/ProductDetailModal';
-import LoginModal from './components/LoginModal';
-import UserSummaryModal from './components/UserSummaryModal';
 import Footer from './components/Footer';
-import ShareSheet from './components/ShareSheet';
-import { PrivacyModal, TermsModal, ContactModal } from './components/LegalModals';
+import LoginModal from './components/LoginModal';
 
 // 🔥 Lazy load للشات
 const ChatManager = lazy(() => import('./components/ChatManager'));
+
+interface Product {
+  id: string;
+  title: string;
+  category: string;
+}
 
 const App: React.FC = () => {
   const [user, setUser] = useState<{ email: string; name: string } | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [showChat, setShowChat] = useState(false);
-  const [activeChatSeller, setActiveChatSeller] = useState<string | null>(null);
+  const [activeChatAdId, setActiveChatAdId] = useState<string | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
 
   // مراقبة الدخول
   useEffect(() => {
@@ -44,6 +46,12 @@ const App: React.FC = () => {
   // لو المستخدم غير مسجل دخول
   if (!user) return <LoginModal onClose={() => {}} onLogin={(e, n) => setUser({email: e, name: n})} hideCloseButton initialMode="login" />;
 
+  // التعامل مع فتح الشات لكل إعلان
+  const handleStartChat = (adId: string) => {
+    setActiveChatAdId(adId);
+    setShowChat(true);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
       <Navbar user={user} onOpenChat={() => setShowChat(true)} />
@@ -52,21 +60,16 @@ const App: React.FC = () => {
       <main className="flex-grow max-w-7xl mx-auto px-4 py-8 w-full">
         {!showChat ? (
           <div className="grid grid-cols-2 gap-4">
-            {/* Products هنا */}
-            <ProductCard product={{id:'1', title:'مثال', category:'All'}} onStartChat={() => setShowChat(true)} />
+            {products.length > 0 ? (
+              products.map(p => (
+                <ProductCard 
+                  key={p.id} 
+                  product={p} 
+                  onStartChat={() => handleStartChat(p.id)} 
+                />
+              ))
+            ) : (
+              <p className="text-slate-400">لا توجد منتجات حالياً</p>
+            )}
           </div>
-        ) : (
-          <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center">جاري فتح المحادثة...</div>}>
-            <div className="fixed inset-0 z-50 p-4 flex items-center justify-center bg-black/80">
-              <ChatManager adId={activeChatSeller || 'demo'} onClose={() => setShowChat(false)} />
-            </div>
-          </Suspense>
-        )}
-      </main>
-
-      <Footer />
-    </div>
-  );
-};
-
-export default App;
+        )
