@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
-import { SellerNotification } from '../types';
 import NotificationDropdown from './NotificationDropdown';
 import MobileSyncModal from './MobileSyncModal';
 import { MessageSquare, Search, Bell, Heart, Smartphone, User, ShoppingBag } from 'lucide-react';
+import { SellerNotification } from '../types';
 
 interface NavbarProps {
   onSearch: (query: string) => void;
   onOpenSellModal: () => void;
   user: { email: string; name: string } | null;
   onOpenLogin: () => void;
-  onOpenSignUp: () => void;
   onLogout: () => void;
   wishlistCount: number;
   showFavoritesOnly: boolean;
@@ -20,9 +19,7 @@ interface NavbarProps {
   onMarkAsRead: (id: string) => void;
   onClearAll: () => void;
   onViewMyProfile: () => void;
-  remainingAds: number;
-  searchSuggestions?: string[];
-  onOpenChat: () => void; // السطر ده مهم لربط الشات
+  onOpenChat: () => void; // السطر المهم للشات
 }
 
 const Navbar: React.FC<NavbarProps> = ({ 
@@ -88,7 +85,7 @@ const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Row 2: Search & Glass Controls */}
+          {/* Row 2: Search & Controls */}
           <div className="flex items-center gap-3">
             <div className="flex-1 relative group">
               <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
@@ -104,15 +101,18 @@ const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             <div className="flex items-center gap-1 p-1 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-sm">
-              {/* زر الدردشة الجديد */}
+              {/* زر الشات */}
               <button 
                 onClick={onOpenChat}
                 className="relative p-3 hover:bg-white/10 rounded-xl text-indigo-400 hover:text-white transition-all active:scale-90"
               >
                 <MessageSquare size={18} />
-                <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(99,102,241,1)]"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(99,102,241,1)]"></span>
+                )}
               </button>
 
+              {/* Notifications */}
               <div className="relative">
                 <button
                   onClick={() => setShowNotifMenu(!showNotifMenu)}
@@ -134,6 +134,7 @@ const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
 
+              {/* Wishlist */}
               <button
                 onClick={onToggleFavorites}
                 className={`p-3 rounded-xl transition-all flex items-center gap-1.5 ${
@@ -144,6 +145,7 @@ const Navbar: React.FC<NavbarProps> = ({
                 {wishlistCount > 0 && <span className="text-[10px] font-black">{wishlistCount}</span>}
               </button>
 
+              {/* Mobile Sync */}
               <button 
                 onClick={() => setShowSyncModal(true)}
                 className="p-3 hover:bg-indigo-600/20 text-indigo-400 hover:text-indigo-300 rounded-xl transition-all"
