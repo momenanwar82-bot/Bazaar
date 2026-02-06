@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface AdBannerProps {
@@ -6,28 +7,27 @@ interface AdBannerProps {
 
 const AdBanner: React.FC<AdBannerProps> = ({ className = "" }) => {
   return (
-    <div className={`adsense-banner-slot h-[100px] sm:h-[160px] bg-slate-900/40 rounded-[40px] border border-dashed border-indigo-500/20 flex flex-col items-center justify-center p-4 text-center group overflow-hidden relative shadow-2xl ${className}`}>
-      {/* Dynamic Background Glow */}
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/5 via-transparent to-purple-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+    <div className={`relative h-[160px] rounded-[40px] border border-dashed border-white/10 flex flex-col items-center justify-center p-8 text-center bg-[#0b1121]/40 ${className}`}>
       
-      {/* Shimmer Effect */}
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-[2500ms] ease-in-out"></div>
+      {/* Top markers */}
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-10">
+        <div className="w-1.5 h-1.5 bg-[#4f46e5] rounded-full opacity-50"></div>
+        <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.4em]">Global Ad Network</span>
+        <div className="w-1.5 h-1.5 bg-[#4f46e5] rounded-full opacity-50"></div>
+      </div>
       
-      <div className="relative z-10 space-y-3">
-        <div className="flex items-center justify-center gap-3">
-          <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></span>
-          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.5em]">Global Ad Network</span>
-          <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping delay-500"></span>
-        </div>
-        <div className="text-sm sm:text-lg font-black text-white uppercase tracking-tighter group-hover:scale-105 transition-transform duration-500">
-          Boost Your Sales with <span className="text-indigo-500">Bazaar Premium</span>
-        </div>
-        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest opacity-60">Verified listings reach 10x more buyers</p>
+      <div className="space-y-2 mt-4">
+        <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tighter">
+          Boost Your Sales with <span className="text-[#4f46e5]">Bazaar Premium</span>
+        </h2>
+        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+          Verified listings reach 10x more potential buyers
+        </p>
       </div>
 
-      {/* Modern Accents */}
-      <div className="absolute top-6 left-6 w-3 h-3 border-t-2 border-l-2 border-indigo-500/20 rounded-tl-md"></div>
-      <div className="absolute bottom-6 right-6 w-3 h-3 border-b-2 border-r-2 border-indigo-500/20 rounded-br-md"></div>
+      {/* Decorative corners */}
+      <div className="absolute top-6 left-6 w-4 h-4 border-t border-l border-white/10 rounded-tl-xl"></div>
+      <div className="absolute bottom-6 right-6 w-4 h-4 border-b border-r border-white/10 rounded-br-xl"></div>
     </div>
   );
 };

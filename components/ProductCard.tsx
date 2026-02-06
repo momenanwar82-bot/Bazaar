@@ -1,18 +1,18 @@
+
 import React from 'react';
 import { Product } from '../types';
-import { MessageSquare, Share2, Heart, Trash2, Star } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface ProductCardProps {
   product: Product;
   onClick: () => void;
   isWishlisted?: boolean;
   onToggleWishlist?: (e: React.MouseEvent) => void;
-  onShowToast?: (message: string, type?: 'success' | 'error') => void;
   currentUserEmail?: string;
   onDelete?: (productId: string) => void;
   showDeleteButton?: boolean; 
   onShare: (product: Product) => void;
-  onStartChat: () => void; // بدء الشات مباشر
+  onChat?: (product: Product) => void;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
@@ -20,25 +20,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onClick, 
   isWishlisted = false, 
   onToggleWishlist,
-  currentUserEmail,
-  onDelete,
-  showDeleteButton = false, 
   onShare,
-  onStartChat
 }) => {
-  const isOwner = currentUserEmail && (product.sellerEmail ?? '') === currentUserEmail;
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!onDelete) return;
-    if (window.confirm("Are you sure you want to remove this ad?")) {
-      onDelete(product.id);
-    }
-  };
+  const navigate = useNavigate();
 
   const handleChatClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onStartChat();
+    navigate('/chat');
   };
 
   const handleShareClick = (e: React.MouseEvent) => {
@@ -46,98 +34,80 @@ const ProductCard: React.FC<ProductCardProps> = ({
     onShare(product);
   };
 
+  const handleWhatsAppClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    let digits = product.phoneNumber.replace(/\D/g, '');
+    const message = encodeURIComponent(`Hi, I'm interested in: ${product.title}`);
+    window.open(`https://wa.me/${digits}?text=${message}`, '_blank');
+  };
+
   return (
     <div 
       onClick={onClick}
-      className="group bg-gradient-to-br from-[#0a0a0c] to-[#121218] rounded-[32px] overflow-hidden border border-white/5 shadow-2xl transition-transform duration-300 cursor-pointer flex flex-col h-full relative text-left hover:scale-[1.02]"
+      className="bg-[#0b1121] rounded-[3rem] overflow-hidden border border-white/5 shadow-2xl flex flex-col h-full active:scale-[0.98] transition-transform duration-300"
     >
-      {/* Image */}
-      <div className="relative aspect-[4/5] overflow-hidden bg-slate-900 flex items-center justify-center">
+      {/* Product Image */}
+      <div className="relative aspect-square overflow-hidden">
         <img 
           src={product.imageUrl} 
           alt={product.title}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 brightness-90 group-hover:brightness-100"
-          loading="lazy"
+          className="w-full h-full object-cover"
         />
         
-        {/* Top Actions */}
-        <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
-          {/* Rating */}
-          {product.rating !== undefined && product.rating > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl">
-              <Star size={10} className="text-amber-400 fill-current" />
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] font-black text-white leading-none">{product.rating}</span>
-                <span className="text-[8px] font-bold text-white/40 leading-none">({product.reviewsCount ?? 0})</span>
-              </div>
-            </div>
-          )}
-
-          {/* Wishlist */}
-          <button
-            onClick={(e) => { e.stopPropagation(); onToggleWishlist?.(e); }}
-            className={`p-2.5 rounded-xl backdrop-blur-md transition-all border shadow-lg focus:outline-none ${
-              isWishlisted ? 'bg-rose-500 text-white border-rose-400' : 'bg-black/40 text-white/70 border-white/10 hover:bg-black/60'
-            }`}
-          >
-            <Heart size={14} className={isWishlisted ? 'fill-current' : ''} />
-          </button>
-        </div>
-
-        {/* Delete Button */}
-        {showDeleteButton && isOwner && (
-          <button
-            onClick={handleDelete}
-            className="absolute bottom-3 right-3 p-2.5 bg-rose-600/90 hover:bg-rose-500 text-white rounded-xl backdrop-blur-md transition-all z-10 border border-rose-400/30 shadow-lg focus:outline-none"
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
+        {/* Wishlist Button */}
+        <button
+          onClick={onToggleWishlist}
+          className="absolute top-4 left-4 p-2.5 bg-black/30 backdrop-blur-md rounded-2xl border border-white/10 text-white"
+        >
+          <svg className={`h-4 w-4 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+        </button>
       </div>
 
-      {/* Info */}
-      <div className="p-5 flex flex-col flex-grow">
-        {/* Category */}
+      <div className="p-6 flex flex-col flex-grow">
         <div className="mb-2">
-          <span className="inline-block px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-lg text-[8px] font-black uppercase tracking-widest">
+          <span className="inline-block px-3 py-1 bg-[#1f2937] text-indigo-400 rounded-lg text-[9px] font-black uppercase tracking-widest">
             {product.category}
           </span>
         </div>
 
-        {/* Title & Price */}
         <div className="mb-4">
-          <h3 className="text-xs font-bold text-white uppercase tracking-tight line-clamp-1 mb-1 opacity-90">
+          <h3 className="text-sm font-black text-white uppercase tracking-tight line-clamp-1 mb-1">
             {product.title}
           </h3>
-          <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-black text-white leading-none">
-              {product.price?.toLocaleString() ?? '0'}
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-black text-white">
+              {product.price.toLocaleString()}
             </span>
-            <span className="text-[10px] uppercase font-black text-indigo-500 tracking-widest">
-              {product.currency ?? 'USD'}
+            <span className="text-xl font-black text-white">
+              {product.currency || '$'}
             </span>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="mt-auto flex flex-col gap-2">
+        <div className="mt-auto space-y-3">
           <button 
-            onClick={handleShareClick}
-            className="w-full py-3.5 bg-white/5 hover:bg-white/10 text-white/70 rounded-2xl text-[9px] font-black border border-white/5 uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 focus:outline-none"
+            onClick={onClick}
+            className="w-full py-4 bg-[#4f46e5] hover:bg-[#4338ca] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
           >
-            <Share2 size={12} />
-            SHARE
+            Contact Now
           </button>
           
-          {!isOwner && (
+          <div className="flex gap-2">
             <button 
-              onClick={handleChatClick}
-              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 focus:outline-none"
+              onClick={handleWhatsAppClick}
+              className="flex-1 py-3 bg-[#065f46]/20 text-[#10b981] rounded-2xl text-[8px] font-black uppercase tracking-widest border border-[#10b981]/20 transition-all active:scale-95"
             >
-              <MessageSquare size={12} />
-              LIVE CHAT
+              WhatsApp
             </button>
-          )}
+            <button 
+              onClick={handleShareClick}
+              className="flex-1 py-3 bg-white/5 text-slate-400 rounded-2xl text-[8px] font-black uppercase tracking-widest border border-white/5 transition-all active:scale-95"
+            >
+              Share
+            </button>
+          </div>
         </div>
       </div>
     </div>

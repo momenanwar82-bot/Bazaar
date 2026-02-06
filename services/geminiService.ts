@@ -37,15 +37,16 @@ const firebaseConfig = {
   storageBucket: "bazaar-1c7e8.firebasestorage.app",
   messagingSenderId: "162360142442",
   appId: "1:162360142442:web:615845038d886f1eb3f813",
-  measurementId: "G-HP0H1DBKJC"
+  measurementId: "G-HP0H1DBKJC",
+  databaseURL: "https://bazaar-1c7e8-default-rtdb.firebaseio.com" // إضافة رابط قاعدة البيانات اللحظية
 };
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 
-// Initializes a new GoogleGenAI instance using the environment variable.
-const getAI = () => {
+// ... (باقي الكود كما هو)
+export const getAI = () => {
   if (!process.env.API_KEY) return null;
   return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
@@ -92,7 +93,6 @@ export const markNotificationAsRead = async (id: string) => {
   await updateDoc(doc(db, "notifications", id), { isRead: true }); 
 };
 
-// Uses Gemini to generate product title and description from an image
 export const identifyProductFromImage = async (base64Image: string): Promise<any> => {
   try {
     const ai = getAI();
@@ -110,7 +110,6 @@ export const identifyProductFromImage = async (base64Image: string): Promise<any
   } catch (error) { return null; }
 };
 
-// Uses Gemini to determine if an image is safe for the marketplace
 export const analyzeImageSafety = async (base64Image: string): Promise<{ isSafe: boolean; reason?: string }> => {
   try {
     const ai = getAI();
@@ -145,21 +144,15 @@ export const getUserUploadCountToday = async (email: string): Promise<number> =>
 
 export const getSellerStats = async (sellerName: string): Promise<any> => {
   try {
-    // Fetch product reviews
     const productReviewsQ = query(collection(db, "product_comments"), where("sellerName", "==", sellerName));
     const productSnap = await getDocs(productReviewsQ);
-    
-    // Fetch direct seller profile ratings
     const sellerRatingsQ = query(collection(db, "seller_ratings"), where("sellerName", "==", sellerName));
     const sellerSnap = await getDocs(sellerRatingsQ);
-
     const productRatings = productSnap.docs.map(d => d.data().rating as number);
     const directRatings = sellerSnap.docs.map(d => d.data().rating as number);
-    
     const allRatings = [...productRatings, ...directRatings];
     const count = allRatings.length;
     const avg = count > 0 ? (allRatings.reduce((a, b) => a + b, 0) / count) : 0;
-    
     return { rating: Number(avg.toFixed(1)), reviewsCount: count, joinedDate: "Feb 2024" };
   } catch (e) { return { rating: 0, reviewsCount: 0, joinedDate: "Feb 2024" }; }
 };
@@ -188,13 +181,10 @@ export const addProductReview = async (productId: string, rating: number, userNa
   try {
     const productRef = doc(db, "products", productId);
     const productSnap = await getDoc(productRef);
-    
     if (!productSnap.exists()) return false;
     const productData = productSnap.data();
     const sellerEmail = productData.sellerEmail;
     const productTitle = productData.title;
-
-    // 1. Add the review
     await addDoc(collection(db, "product_comments"), { 
       productId, 
       sellerName: productData.sellerName, 
@@ -203,18 +193,13 @@ export const addProductReview = async (productId: string, rating: number, userNa
       comment, 
       timestamp: serverTimestamp() 
     });
-
-    // 2. Recalculate Average for the product specifically
     const q = query(collection(db, "product_comments"), where("productId", "==", productId));
     const snapshot = await getDocs(q);
     const ratings = snapshot.docs.map(d => d.data().rating as number);
     const newCount = ratings.length;
     const newAvg = ratings.reduce((a, b) => a + b, 0) / newCount;
-
-    // 3. Strict Quality Check: If rating < 2, purge the product
     if (newAvg < 2 && newCount >= 1) {
       await deleteDoc(productRef);
-      // Notify seller
       await addDoc(collection(db, "notifications"), {
         sellerEmail,
         productTitle,
@@ -225,25 +210,18 @@ export const addProductReview = async (productId: string, rating: number, userNa
       });
       return true; 
     }
-
-    // 4. Update product stats normally
     await updateDoc(productRef, {
       rating: Number(newAvg.toFixed(1)),
       reviewsCount: newCount
     });
-
     return true;
-  } catch (e) { 
-    console.error("Error adding review:", e);
-    return false; 
-  }
+  } catch (e) { return false; }
 };
 
 export const getLiveChatResponse = async (productTitle: string, userMessage: string, history: any[]): Promise<string> => {
   try {
     const ai = getAI();
     if (!ai) return "Service unavailable.";
-
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Product Context: "${productTitle}"\nBuyer Inquiry: "${userMessage}"`,
@@ -252,10 +230,6 @@ export const getLiveChatResponse = async (productTitle: string, userMessage: str
         Be concise, friendly, and act as a human seller would. Focus on helping the buyer and providing accurate information based on the context.`
       }
     });
-
     return response.text || "I'm sorry, I'm not sure how to answer that. Could you please clarify?";
-  } catch (error) {
-    console.error("Gemini Chat Error:", error);
-    return "The seller is currently unavailable.";
-  }
+  } catch (error) { return "The seller is currently unavailable."; }
 };
