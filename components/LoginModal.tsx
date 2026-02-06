@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { registerUser, loginUser } from '../services/geminiService';
 
