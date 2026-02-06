@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { CATEGORIES } from '../constants';
 import { Category } from '../types';
